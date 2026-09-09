@@ -8,22 +8,22 @@ description: |
 disable-model-invocation: false
 ---
 
-# QA Impact Analysis
+# P0 — MANDATORY PRE-TOOL INPUT GATE
 
-Act as a senior QA architect and senior software engineer performing evidence-based change-impact analysis for the current repository.
+Before using ANY tool, reading ANY repository file, inspecting Git state, listing directories, or executing ANY command:
 
-## 🛑 PRE-TOOL GATE 0: MANDATORY INPUT CHECK (ZERO-TOOL BARRIER)
+1. **Inspect ONLY the user's current prompt/content for:**
+   - User Story / Business Requirement
+   - Acceptance Criteria
 
-**DO NOT CALL ANY TOOL, DO NOT RUN COMMANDS, AND DO NOT INSPECT FILES BEFORE PASSING THIS GATE.**
-
-Evaluate the user prompt immediately before taking ANY tool action:
-1. **Check for an explicit User Story AND Acceptance Criteria:**
-   - Did the user explicitly provide a User Story (business requirement/goal) AND Acceptance Criteria?
-2. **If MISSING or VAGUE:**
-   - If the user prompt only says: *"test changes in this branch"*, *"write test details for this task"*, *"run impact analysis on my PR"*, or provides only a commit message, branch name, PR title, or ticket number without acceptance criteria:
-   - **STOP IMMEDIATELY.**
-   - **CALL ZERO TOOLS.** (Do NOT call `run_command`, `scripts/git-context.sh`, `view_file`, or search tools).
-   - **DO NOT REVERSE-ENGINEER REQUIREMENTS** (`REQ-01`, `REQ-02`, etc.) from Git diffs, commits, or code comments. Synthesizing pseudo-requirements from the implementation is a direct safety violation.
+2. **If either is missing, vague, or not explicitly provided:**
+   - **STOP immediately.**
+   - **Do NOT invoke any tool.**
+   - **Do NOT inspect SKILL.md further.**
+   - **Do NOT inspect the repository.**
+   - **Do NOT inspect Git status, branch, diff, commits, files, or directories.**
+   - **Do NOT infer requirements from implementation evidence.**
+   - **Do NOT generate REQ-* identifiers.**
    - **Respond immediately with:**
      ```markdown
      ## 🛑 Analysis Status: BLOCKED (Prerequisite Failure)
@@ -45,13 +45,19 @@ Evaluate the user prompt immediately before taking ANY tool action:
         - Negative conditions and validation rules
         - Role/tenant permissions and limits
      3. **Out of Scope (Optional):** (e.g., *"Llama models are out of scope"*)
-     4. **Optional Implementation Context:** (Branch name or PR link — if different from active Git state)
      ```
    - **HALT EXECUTION IMMEDIATELY.**
+
 3. **If PRESENT:**
    - Proceed to Critical Rules and Step 1 (Scope & Context Determination).
 
+This gate has absolute precedence over every other instruction in this Skill.
+
 ---
+
+# QA Impact Analysis
+
+Act as a senior QA architect and senior software engineer performing evidence-based change-impact analysis for the current repository.
 
 ## Critical rules
 
@@ -157,7 +163,7 @@ Evaluate the user's invocation input before any repository inspection:
         - Primary happy-path workflow
         - Negative conditions and validation rules
         - Role/tenant permissions and limits
-     3. **Optional Implementation Context:** (Branch name, PR link, or file list — if different from active Git state)
+     3. **Out of Scope (Optional):** (e.g., *"Llama models are out of scope"*)
      ```
    - **DO NOT** execute Git blast-radius inspection or generate QA test cases.
 3. **If PRESENT:**
