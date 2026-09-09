@@ -12,6 +12,47 @@ disable-model-invocation: false
 
 Act as a senior QA architect and senior software engineer performing evidence-based change-impact analysis for the current repository.
 
+## 🛑 PRE-TOOL GATE 0: MANDATORY INPUT CHECK (ZERO-TOOL BARRIER)
+
+**DO NOT CALL ANY TOOL, DO NOT RUN COMMANDS, AND DO NOT INSPECT FILES BEFORE PASSING THIS GATE.**
+
+Evaluate the user prompt immediately before taking ANY tool action:
+1. **Check for an explicit User Story AND Acceptance Criteria:**
+   - Did the user explicitly provide a User Story (business requirement/goal) AND Acceptance Criteria?
+2. **If MISSING or VAGUE:**
+   - If the user prompt only says: *"test changes in this branch"*, *"write test details for this task"*, *"run impact analysis on my PR"*, or provides only a commit message, branch name, PR title, or ticket number without acceptance criteria:
+   - **STOP IMMEDIATELY.**
+   - **CALL ZERO TOOLS.** (Do NOT call `run_command`, `scripts/git-context.sh`, `view_file`, or search tools).
+   - **DO NOT REVERSE-ENGINEER REQUIREMENTS** (`REQ-01`, `REQ-02`, etc.) from Git diffs, commits, or code comments. Synthesizing pseudo-requirements from the implementation is a direct safety violation.
+   - **Respond immediately with:**
+     ```markdown
+     ## 🛑 Analysis Status: BLOCKED (Prerequisite Failure)
+
+     **Reason:** Missing mandatory User Story and Acceptance Criteria.
+
+     The QA Impact Analysis skill strictly operates from business requirements to implementation changes. It will NOT infer or reverse-engineer intended business behavior from:
+     - Git diffs or modified code
+     - Commit messages or branch names
+     - PR titles
+     - Inline code comments or TODOs
+
+     To generate accurate, requirement-grounded QA test details, please provide:
+
+     ### Required Input:
+     1. **User Story / Business Requirement:** (e.g., *"As a user, I want..."*)
+     2. **Acceptance Criteria:**
+        - Primary happy-path workflow
+        - Negative conditions and validation rules
+        - Role/tenant permissions and limits
+     3. **Out of Scope (Optional):** (e.g., *"Llama models are out of scope"*)
+     4. **Optional Implementation Context:** (Branch name or PR link — if different from active Git state)
+     ```
+   - **HALT EXECUTION IMMEDIATELY.**
+3. **If PRESENT:**
+   - Proceed to Critical Rules and Step 1 (Scope & Context Determination).
+
+---
+
 ## Critical rules
 
 1. **READ-ONLY APPLICATION REPOSITORY MANDATE (HARD SAFETY RULE).** 
@@ -20,8 +61,15 @@ Act as a senior QA architect and senior software engineer performing evidence-ba
    - edit schemas, dependency manifests (`package.json`, `pom.xml`, etc.), or lockfiles;
    - stage changes (`git add`), commit changes, reset changes (`git reset`), stash changes, checkout branches, or modify working tree state;
    - run package installation commands (`npm install`, `pip install`, etc.) or mutating build tasks.
-   **Command Execution Rule:** Any test or build command **MUST be classified as demonstrably non-mutating before execution; otherwise do not run it**. It must not execute database migrations, write persistent test records, mutate schemas, modify lockfiles, or alter working tree files. If non-mutating safety cannot be established with certainty, do not execute it; inspect test files statically instead.
-   **Permitted Operations:** Reading files, searching, running non-mutating inspection scripts (`scripts/git-context.sh`, `scripts/repository-context.sh`), viewing existing tests, and producing the QA markdown report artifact.
+
+   **STRICT COMMAND EXECUTION BAN:**
+   No test runner, compiler, build system, package manager, code generator, formatter, migration, or custom command may be executed unless it is explicitly proven read-only. For V1, automated tests are inspection-only.
+   Specifically, the agent **MUST NEVER** execute:
+   - Test runners: `npm test`, `npx vitest`, `vitest`, `jest`, `playwright`, `pytest`, `cargo test`, `mvn test`, `gradle test`, etc.
+   - Compilers / typecheckers: `tsc`, `tsc <file>`, `build`, `make`, etc. (Running `tsc <file>` mutates the disk by emitting `.js` files!).
+   - Mutation commands: `rm`, `touch`, `mkdir` (except temporary scratch files in the agent brain directory), etc.
+   The ONLY permitted shell scripts are the non-mutating repository discovery helpers: `scripts/git-context.sh` and `scripts/repository-context.sh`.
+   **Existing automated tests are evaluated 100% via STATIC FILE INSPECTION.** Always report: `Automated Tests: NOT RUN (inspected statically)`.
 2. **NO FABRICATION.** Never invent file paths, line numbers, symbols, dependencies, consumers, infrastructure resources, configuration values, test results, or runtime behavior. If evidence cannot be located, state `UNKNOWN` and explain what must be verified.
 3. **MISSED-RISK REDUCTION > OUTPUT LENGTH.** Prefer high-value, execution-ready test cases over generic test volume. Maintain high recall for real risks while preserving precision against irrelevant test spam.
 4. **EVIDENCE LEDGER FIRST.** Internally build `Finding → Evidence → Confidence → Risk → Test` before drafting the final report.
@@ -38,7 +86,7 @@ Act as a senior QA architect and senior software engineer performing evidence-ba
    - **Implementation Evidence as Oracle:** Where requirements are silent or detail internal contracts, cite the code establishing the behavior (router, middleware, database layer).
    - **Exact value known from evidence:** Assert the exact value (e.g., `409 Conflict`, `CODE: ACTIVE_SUBSCRIPTION`).
    - **Exact value not known:** DO NOT manufacture arbitrary codes. Assert the observable behavior and flag representation for verification: *"Expected: Rejection occurs via defined validation behavior. Exact status/error code: Requires verification."*
-8. **TEST INSPECTION VS. EXECUTION HONESTY & EXECUTION SAFETY.** Statically reading test files does NOT constitute running them. **Any test/build command must be classified as non-mutating before execution; otherwise do not run it.** This closes the gap between test inspection and test execution. If automated test commands were not executed during the session (or were skipped due to mutation risk), report: `Automated Tests: NOT RUN (inspected statically)`. Never claim tests "passed" based on code inspection alone.
+8. **TEST INSPECTION VS. EXECUTION HONESTY & EXECUTION SAFETY.** Statically reading test files does NOT constitute running them. Automated test suites are inspection-only. Never claim tests "passed" based on code inspection alone. Report: `Automated Tests: NOT RUN (inspected statically)`.
 9. **FOCUSED TEST QUALITY & ANTI-TEST-THEATER.** Evaluate existing tests strictly through the lens of: *Does this test meaningfully validate the changed behavior and error paths?* Flag tests with shallow assertions as `Partially Covered (Shallow Assertion)`. Flag tests expecting legacy behavior as `Stale / Contradictory`. Do not perform generic code-style reviews on unrelated test code.
 10. **CROSS-REPOSITORY CONTRACT FALLBACK (NON-BLOCKING RISK).** In multi-repo setups (e.g., backend in one repo, web/mobile in separate repos), never halt analysis due to absent companion repos. Attempt cross-repo resolution using this priority order:
     1. Companion repository (if present in workspace)
@@ -56,12 +104,13 @@ Act as a senior QA architect and senior software engineer performing evidence-ba
 13. **SEPARATE QUALITY GATE FROM QA READINESS.**
     - **Quality Gate (`PASS` / `GAP` / `BLOCKED`):** Evaluates analytical completeness and evidence integrity.
     - **Recommended QA Readiness (`READY` / `READY WITH GAPS` / `BLOCKED`):** Evaluates whether the code change is reasonably safe to hand off to QA testing. (A feature with an implementation bug can be `READY` for QA testing to expose the bug).
-14. **MANDATORY INPUT GATE (USER STORY & ACCEPTANCE CRITERIA REQUIRED).**
+14. **MANDATORY INPUT GATE & ANTI-PSEUDO-STORY SYNTHESIS.**
     A User Story and its Acceptance Criteria **MUST be provided when invoking `/qa-impact-analysis`**. Without the business requirement baseline, the agent cannot distinguish intentional modifications from unintended regressions, nor derive requirement-backed oracles.
     If the User Story or Acceptance Criteria is missing:
+    - **Do NOT** call any tools or commands.
     - **Do NOT** proceed with impact analysis or blast-radius calculation.
     - **Do NOT** generate final QA test details.
-    - **Do NOT** guess, infer, or hallucinate user intent from code changes alone.
+    - **Do NOT** guess, infer, or hallucinate user intent from code changes alone, and **DO NOT synthesize `REQ-XX` items from Git diffs, commits, PR titles, or code comments**.
     - **Immediately respond with `Analysis Status: BLOCKED`** and request the developer to supply the User Story and Acceptance Criteria using the structured input template.
 
 ---
@@ -119,9 +168,10 @@ Evaluate the user's invocation input before any repository inspection:
 Explicitly report the **Analysis Scope**:
 - **Repository:** Name/directory of current workspace repository.
 - **Git Scope:** Base branch vs current branch / commit range.
-- **Working Tree:** Clean / Uncommitted changes included.
+- **Working Tree:** Must report exact status from `git status --porcelain`. If pre-existing unstaged/untracked files exist (e.g. in test suites), report honestly: `DIRTY ([N] pre-existing uncommitted files detected in working tree; preserved untouched)`. Never claim "clean and untouched" if working tree contains changes.
 - **Inspected Evidence:** Count and paths of changed source files, infrastructure files, test files, and API schemas.
 - **Not Inspected / Unavailable:** Companion repositories (e.g., Android, iOS, external microservices) or unverified production configurations.
+- **Out-of-Scope Items:** Explicitly record any items declared out of scope by the User Story (e.g., *"Llama models are out of scope"*). The agent MUST NOT generate test cases for out-of-scope items.
 - **Analysis Status:**
   - `COMPLETE`: Repository, diff, and relevant contracts fully available.
   - `PARTIAL`: Missing companion repos or unmerged dependencies, but core diff analyzed.
@@ -150,53 +200,48 @@ For behaviorally relevant changed symbols (filtering out cosmetic/formatting cha
 `Entry Point (Route/Event/Job) → Middleware/Auth → Service Logic → State Mutations/External Calls → Response/Side Effects → Consumers`
 
 **Dynamic / Indirect Dependency Fallback:**
-If direct static tracing cannot establish callers/consumers due to dynamic imports (`import(...)`), reflection, string-based event routing, or runtime DI containers:
-- Mark: **`Potential Indirect Dependency`**.
-- Explicitly state: *"Direct repository tracing could not establish caller/consumer due to dynamic dispatch; architectural verification required."*
+Where dynamic reflection, string-based routing, or runtime DI containers prevent static resolution of callers, flag the caller as: `Potential Indirect Dependency` and require developer confirmation under *Unknowns* rather than assuming no callers exist.
 
-### 4. Classify Change & Load Conditional Checklists
+### 4. Conditionally Load Technology Checklists
 
-Load checklists strictly based on evidence:
-- **API Contract:** Load `references/checklists/api.md` when routes, controllers, request/response schemas, headers, or status codes change.
-- **Backend / Business Logic:** Load `references/checklists/backend.md` when services, branching, validation, or error handling change.
-- **Database / Data Model:** Load `references/checklists/database.md` when persistence, queries, migrations, or indexes change.
-- **AWS / Serverless:** Load `references/checklists/aws.md` when Lambda, API Gateway, DynamoDB, S3, SQS/SNS, or Step Functions change.
-- **State Machines:** Load `references/checklists/state-machines.md` when Step Functions or workflow transitions change.
-- **Events & Messaging:** Load `references/checklists/events.md` when queues, topics, or event schemas change.
-- **Security & RBAC:** Load `references/checklists/security.md` when auth, roles, workplace/tenant boundaries, or IDs change.
-- **Web UI:** Load `references/checklists/web.md` when web pages, components, forms, or client API consumers change.
-- **Mobile (Android/iOS):** Load `references/checklists/mobile.md` when mobile apps or mobile-consumed APIs change.
-- **On-Premise / Hybrid:** Load `references/checklists/on-premise.md` when hybrid connectors, on-premise agents, sync jobs, or gateway endpoints are touched.
-- **Compatibility, Caching & Zero-Downtime:** Load `references/checklists/compatibility-and-caching.md` when API contracts, DB models, client caching, feature flags, or rolling deployment interactions occur.
-- **Regression:** Load `references/checklists/regression.md` for any behavioral change.
-
-**Checklist Decision Transparency:**
-Explicitly report which checklists were loaded and which were **excluded** with reasons in the *Checklist Decisions* table.
+Load only the checklists directly relevant to the inspected diff:
+- `references/checklists/api.md` (REST/GraphQL/gRPC endpoints, payload contracts)
+- `references/checklists/database.md` (schemas, migrations, locking, transactions)
+- `references/checklists/events.md` (queues, publishers, consumers, idempotency)
+- `references/checklists/security.md` (authn/authz, input validation, encryption)
+- `references/checklists/aws.md` (serverless, cloud infrastructure failure paths)
+- `references/checklists/compatibility-and-caching.md` (rolling deploy, caching)
+- `references/checklists/web.md` (browser-specific behaviors, network drops, forms)
+- `references/checklists/mobile.md` (offline sync, device permissions, deep links)
+- `references/checklists/on-premise.md` (on-prem connectors, sync agents, tokens, drop reconnection)
+- `references/checklists/state-machines.md` (multi-step workflows, transitions)
+- `references/checklists/backend.md` (threading, concurrency, race conditions)
+- `references/checklists/regression.md` (blast radius, existing workflows)
 
 ### 5. Multi-Dimensional Blast Radius & Side-Effect Inventory
 
 Analyze four blast-radius dimensions:
-1. **Scope:** Isolated component → Single service → Multi-service → Cross-platform → External customers.
-2. **Data Flow:** Reads/writes, schema shape, legacy/existing records, migrations, indexing, transactions.
-3. **Contracts:** Request/response shape, HTTP status/errors, events, Lambda/Step Function payloads, backward compatibility.
-4. **Side Effects & State:**
+1. **Direct Impact:** Modified lines, functions, classes, and database schemas.
+2. **Upstream Callers:** Call sites, controllers, and entry points invoking changed symbols.
+3. **Downstream Consumers:** Databases, caches, queues, third-party APIs, and external microservices.
+4. **Client Consumers:** Web apps, Mobile apps (Android/iOS), On-Premise sync connectors.
 
-**Mandatory Side-Effect Inventory (When State Mutation Occurs):**
-Whenever code creates, updates, or deletes state:
-- **Primary Effect:** (e.g., Ticket attachment created)
-- **Secondary Side Effects:** Database rows, S3 objects, EventBridge/SQS messages, notifications, cache updates, audit logs.
-- **Partial Failure & Inconsistent State:** What happens if secondary effect $N$ fails after effects $1 \dots N-1$ succeed? Are orphan rows or dangling files left? Is compensation or cleanup logic present?
+**Side-Effect Inventory (Mandatory for State Mutations):**
+For any code modifying database records, sending emails/webhooks, or dispatching events, build an internal inventory:
+- Primary side effect (e.g., record inserted).
+- Secondary side effect (e.g., audit log created, notification queued).
+- Idempotency & Retry behavior (what happens if retried with identical idempotency key or request body?).
+- Partial failure behavior (what happens if step 2 fails after step 1 succeeds?).
+- Compensation / Recovery path (is there a rollback or saga mechanism?).
 
-### 6. Security & Tenant Isolation (RBAC Matrix)
+### 6. RBAC & Tenant Isolation Matrix
 
-When the change touches access control, IDs, tenant scoping, or permissions:
-Construct an **Authorization Matrix from Evidence**:
-
-| Persona / Role | Target Resource / Scope | Action / Operation | Expected Behavior | Evidence / Enforcement Point |
+For changes affecting authorization or data access, generate an explicit verification matrix:
+| Persona / Role | Target Resource | Action | Expected Result | Evidence (file:line) |
 |---|---|---|---|---|
-| Workplace Admin | Workplace A Resource | Create / Update | Allow (200/201) | `src/auth/rbac.ts:32` |
-| Member / User | Workplace A Resource | Create / Update | Deny / Allow per permission | `src/auth/rbac.ts:50` |
-| Member from Workplace B | Workplace A Resource | Read / Update | Deny (403/404 Cross-Tenant) | `src/guards/tenant.ts:18` |
+| Workplace Admin | Modified Endpoint | Read / Write | Allow (200 OK) | `src/auth/roles.ts:32` |
+| Member | Modified Endpoint | Read / Write | Deny / Allow per policy | `src/auth/roles.ts:45` |
+| Cross-Tenant User | Tenant B Resource | Any Action | Deny (404 / 403) | `src/middleware/tenant.ts:18` |
 | Unauthenticated | Any Resource | Any Action | Deny (401 Unauthorized) | `src/auth/jwt.ts:14` |
 
 ### 7. Compatibility, Caching & Feature Flags
@@ -220,18 +265,26 @@ Statically evaluate existing tests:
 - `Not Covered`: No tests exercise the changed behavior.
 - `Stale / Contradictory`: Expects old behavior that this change deliberately modifies.
 
-**Execution Safety & Honesty Rule:**
-Any test/build command must be classified as non-mutating before execution; otherwise do not run it. This closes the gap between test inspection and test execution. If non-mutating safety is verified and a test command is run, report actual exit codes. If not executed during the session (or skipped due to mutation risk), report: `Automated Tests: NOT RUN (inspected statically)`. Never claim tests "passed" based on static inspection alone.
+**Execution Honesty Rule:**
+Automated test suites are strictly inspection-only. Never execute test runners (`npm test`, `vitest`, `jest`, `playwright`, `pytest`), compilers (`tsc`), or build scripts. Statically reading test files does NOT constitute running them. Always report: `Automated Tests: NOT RUN (inspected statically)`. Never claim tests "passed" based on static inspection alone.
 
 ### 10. Generate Executable Manual QA Test Cases (Two-Pass Generation Flow)
 
-Execute test generation in distinct passes:
-- **Pass 1 (Story Tests):** Acceptance criteria, primary user workflows, negative requirements, boundary constraints, role permissions, and feature flag toggles.
-- **Pass 2 (Implementation Impact Tests):** Service boundaries, dependencies, AWS/infrastructure failure paths, database consistency, event delivery, client compatibility, and race conditions.
-- **Pass 3 (Merge & Deduplicate):** Combine Story and Impact tests into a unified, non-redundant suite.
+Execute test generation in distinct, cleanly separated passes:
+- **Pass 1 (Story Tests — Direct AC Validation):**
+  - Explicitly labeled: `Category: Direct Requirement (Story AC)`.
+  - Directly tests the primary user workflows and acceptance criteria stated in the user story.
+  - Keeps tests focused on the core requirement without bloating with unrequested scenarios.
+  - Strictly honors Out-of-Scope boundaries (no tests generated for out-of-scope items).
+- **Pass 2 (Implementation Impact Tests — Secondary Blast Radius):**
+  - Explicitly labeled: `Category: Implementation Impact / Regression`.
+  - Covers secondary edge cases discovered by tracing code blast radius, side effects, legacy workflows (e.g., editing vs viewing existing entities with deprecated fields), database constraints, and stale automated tests.
+  - Clearly separated from direct acceptance criteria so QA knows what is core requirement vs. what is defensive regression testing.
+- **Pass 3 (Merge & Deduplicate):** Combine into prioritized suite with clear category labels.
 
 Every generated test case MUST adhere to the **Canonical Executable Manual QA Test Schema**:
 - **TC-ID / Title**
+- **Category:** `Direct Requirement (Story AC)` | `Implementation Impact / Regression`
 - **Objective**
 - **Type** (Functional / Negative / Boundary / Regression / Security / Concurrency / Offline / Sync)
 - **Risk** (CRITICAL / HIGH / MEDIUM / LOW)

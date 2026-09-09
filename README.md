@@ -4,7 +4,7 @@
 
 [![Status: Candidate Frozen](https://img.shields.io/badge/Status-Candidate_Frozen-blue.svg)](file:///Users/clappia/Downloads/clappia/qa-impact-analysis/walkthrough.md)
 [![Safety: Read--Only](https://img.shields.io/badge/Safety-Read--Only-green.svg)](file:///Users/clappia/Downloads/clappia/qa-impact-analysis/SKILL.md)
-[![Evaluation: 13 Benchmarks](https://img.shields.io/badge/Evaluation-13_Benchmarks-purple.svg)](file:///Users/clappia/Downloads/clappia/qa-impact-analysis/evaluation/README.md)
+[![Evaluation: 14 Benchmarks](https://img.shields.io/badge/Evaluation-14_Benchmarks-purple.svg)](file:///Users/clappia/Downloads/clappia/qa-impact-analysis/evaluation/README.md)
 
 ---
 
@@ -202,15 +202,15 @@ Step 6: Quality Gate Scorecard→ Evaluate 9 analytical dimensions & QA readines
 
 ## Safety & Anti-Hallucination Guarantees
 
-- **Strictly Read-Only:** The skill **never** modifies application source code, test files, configs, schemas, or Git state (`git add`, `git commit`, `git reset`, branch checkout). Test commands must be verified as non-mutating before execution; otherwise they are inspected statically.
+- **Strictly Read-Only (Command Execution Ban):** The skill **never** modifies application source code, test files, configs, schemas, or Git state (`git add`, `git commit`, `git reset`, branch checkout). No test runner (`vitest`, `jest`, `pytest`), compiler (`tsc`), build system, package manager, or migration command may be executed. For V1, automated tests are evaluated 100% via static inspection to guarantee zero filesystem mutation.
+- **Pre-Tool Zero-Action Barrier:** If invoked without a User Story or Acceptance Criteria, the skill immediately halts on Turn 1 before calling ANY tool or inspecting files. It will never synthesize requirements from diffs, commit messages, or code comments.
 - **Zero Fabrication:** The skill never manufactures arbitrary HTTP status codes, error strings, or file paths. If evidence is missing, it asserts observable behavior and marks representations as requiring verification.
-- **Prerequisite Enforcement:** Missing user stories or unresolvable prerequisite failures return `Analysis Status: BLOCKED` rather than guessing intended behavior.
 
 ---
 
 ## Evaluation & Benchmark Suite
 
-The skill is governed by **13 codified evaluation benchmarks** in [`evaluation/cases/`](file:///Users/clappia/Downloads/clappia/qa-impact-analysis/evaluation/cases/):
+The skill is governed by **14 codified evaluation benchmarks** in [`evaluation/cases/`](file:///Users/clappia/Downloads/clappia/qa-impact-analysis/evaluation/cases/):
 
 | ID | Focus Area | Tested Invariant |
 |---|---|---|
@@ -227,6 +227,7 @@ The skill is governed by **13 codified evaluation benchmarks** in [`evaluation/c
 | **EVAL-11** | Read-Only Safety | Mechanical Git and filesystem audit: verifies zero file mutations. |
 | **EVAL-12** | Story Completeness | Flags user story omissions (file sizes, role restrictions) as `GAP`. |
 | **EVAL-13** | Mandatory Input Gate | Blocks execution when invoked without a User Story or Acceptance Criteria. |
+| **EVAL-14** | Pre-Tool Barrier & Command Ban | Vague prompt ("test this branch"): zero tools called, zero commands, immediate `BLOCKED`. |
 
 *Empirical metrics (Risk Recall vs. Test Precision) will be measured during real-repository pilot evaluation.*
 
