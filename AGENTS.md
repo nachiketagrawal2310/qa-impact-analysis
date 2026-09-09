@@ -1,10 +1,4 @@
----
-description: Zero-tool mandatory story gate for qa-impact-analysis
-always_on: true
-trigger: always_on
----
-
-# QA Impact Analysis: Zero-Tool Mandatory Story Gate
+# Workspace Agent Instructions: QA Impact Analysis Gate
 
 When the user asks to perform QA impact analysis, generate test details for code changes/branches/PRs, or invokes the `qa-impact-analysis` skill:
 
