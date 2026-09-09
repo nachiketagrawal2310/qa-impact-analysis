@@ -1,7 +1,6 @@
 ---
 description: Zero-tool mandatory story gate for qa-impact-analysis
 always_on: true
-trigger: always_on
 ---
 
 # QA Impact Analysis: Zero-Tool Mandatory Story Gate
