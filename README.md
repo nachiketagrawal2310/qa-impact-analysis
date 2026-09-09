@@ -1,936 +1,282 @@
 # qa-impact-analysis
 
-**Repository-aware AI Skill for implementation-aware QA impact analysis and manual test generation.**
+**Repository-aware AI skill that turns your User Story and Git diff into execution-ready manual QA test details before you open a PR.**
 
-`qa-impact-analysis` helps developers evaluate the QA impact of a feature, bug fix, API change, database change, refactor, or infrastructure change **before raising a PR**.
-
-The Skill combines two sources of truth:
-
-> **User Story / Acceptance Criteria define what the system is supposed to do.**
-> **Repository evidence defines how the system currently behaves and what the implementation actually changes.**
-
-It uses both to identify affected components, risks, dependencies, regressions, security concerns, compatibility issues, and missing QA coverage, then produces structured, execution-ready manual QA test details.
+[![Status: Candidate Frozen](https://img.shields.io/badge/Status-Candidate_Frozen-blue.svg)](file:///Users/clappia/Downloads/clappia/qa-impact-analysis/walkthrough.md)
+[![Safety: Read--Only](https://img.shields.io/badge/Safety-Read--Only-green.svg)](file:///Users/clappia/Downloads/clappia/qa-impact-analysis/SKILL.md)
+[![Evaluation: 13 Benchmarks](https://img.shields.io/badge/Evaluation-13_Benchmarks-purple.svg)](file:///Users/clappia/Downloads/clappia/qa-impact-analysis/evaluation/README.md)
 
 ---
 
-## Core Objective
+## What is this?
 
-The Skill is designed to answer:
+`qa-impact-analysis` is an AI-powered QA architect skill for **Cursor** and **Antigravity IDE**. When you finish a feature, bug fix, API change, database migration, or refactor, it analyzes your active Git changes against your business requirements and outputs a structured, execution-ready manual QA test plan.
 
-**"Given what the developer says should change and what the code actually changes, what does QA need to test?"**
+### Why does it exist?
 
-It is not a replacement for code review and does not modify the application.
+Developers frequently hand changes over to QA with vague notes like *"fixed order submission"* or *"updated export API"*. QA engineers are left guessing:
+- What edge cases were created?
+- What downstream consumers or background jobs were affected?
+- Which roles, permissions, or client versions might break?
 
-The intended workflow is:
+### Why is it different?
+
+Most AI test generators fail because they rely on only **one** source of truth:
+1. **Ticket-only AI:** Reads the Jira issue, hallucinates tests based on generic concepts, and has no idea what the code actually does.
+2. **Diff-only AI:** Reads the Git diff, assumes whatever buggy code the developer wrote was intended, and reverse-engineers tests from bugs.
+
+`qa-impact-analysis` combines **two sources of truth**:
 
 ```text
-User Story + Acceptance Criteria
-              +
-       Current Git / Repository
-              ↓
-      QA Impact Analysis
-              ↓
-   Requirement → Implementation
-              ↓
-      Impact / Risk / Blast Radius
-              ↓
-   Regression / Security / Failure
-              ↓
-      Manual QA Test Coverage
-              ↓
-       QA Release Handoff
+User Story / Acceptance Criteria  →  Defines what the system SHOULD do
+             +
+Actual Git Diff / Repository     →  Defines what the code ACTUALLY does
+             ↓
+     QA Impact Analysis
+             ↓
+Requirement ↔ Implementation Trace
+             ↓
+Multi-Dimensional Blast Radius & Side Effects
+             ↓
+Deterministic Manual QA Test Suite
+             ↓
+     QA Release Handoff
 ```
 
 ---
 
-# Key Principles
+## Quick Start
 
-### 1. Requirement-first
+### 1. Install the Skill
 
-A **User Story and Acceptance Criteria are mandatory inputs**.
+**Option A: Project-Level (Recommended for teams)**
+Copy the `qa-impact-analysis` directory into your project:
+```bash
+# For Cursor
+cp -R qa-impact-analysis .cursor/skills/qa-impact-analysis
 
-The Skill must not infer business requirements from:
-
-* Git diffs
-* commit messages
-* PR titles
-* code comments
-* TODOs
-* existing implementation behavior
-
-When the required story or acceptance criteria are missing, analysis is blocked:
-
-```text
-Analysis Status: BLOCKED
-Reason: Missing User Story / Acceptance Criteria
+# For Antigravity IDE
+cp -R qa-impact-analysis .agents/skills/qa-impact-analysis
 ```
 
-This prevents the implementation itself from becoming the definition of intended behavior.
-
-### 2. Repository-aware
-
-The Skill inspects the actual repository to understand:
-
-* changed files
-* execution paths
-* callers and consumers
-* backend services
-* APIs and contracts
-* databases
-* AWS resources
-* events and queues
-* state machines
-* Web clients
-* Android / iOS clients
-* On-Premise / Hybrid components
-* existing automated tests
-* configuration and infrastructure changes
-
-Repository evidence takes precedence over assumptions or stale architectural documentation.
-
-### 3. Read-only by design
-
-`qa-impact-analysis` is an **analysis-only Skill**.
-
-It must never:
-
-* modify application source code
-* modify test files
-* modify configuration
-* modify schemas
-* modify dependency manifests or lockfiles
-* create, rename, move, or delete application files
-* run `git add`
-* commit changes
-* run `git reset`
-* stash changes
-* checkout or switch branches
-* install dependencies
-* execute mutating build or test operations
-
-Any test or build command must first be established as **demonstrably non-mutating**. When that cannot be established with certainty, the Skill inspects the tests statically instead.
-
-### 4. Evidence over invention
-
-The Skill must not fabricate:
-
-* HTTP status codes
-* API endpoints
-* error codes
-* database fields
-* events
-* logs
-* file paths
-* source locations
-* implementation behavior
-
-When exact implementation evidence is unavailable, the Skill reports the uncertainty instead of inventing details.
-
----
-
-# Invocation
-
-## Required Input
-
-Every normal analysis requires:
-
-```text
-User Story / Business Requirement
-Acceptance Criteria
+**Option B: Global (Available across all repositories)**
+```bash
+# For Antigravity IDE
+cp -R qa-impact-analysis ~/.gemini/config/skills/qa-impact-analysis
 ```
 
-Implementation context is discovered automatically from the repository where possible.
+### 2. Invoke in Chat
 
-### Example
+Open your AI chat in Cursor or Antigravity and provide your **User Story** and **Acceptance Criteria**. The skill automatically detects your branch, staged/unstaged changes, and tech stack:
 
 ```text
 /qa-impact-analysis
 
-User Story:
-As a Workplace Admin, I want to export monthly invoices
-to PDF or CSV so that I can reconcile accounting records.
+Story: As a workplace admin, I want to export monthly invoices to PDF or CSV so that I can reconcile accounting records.
 
 Acceptance Criteria:
-1. The export supports PDF and CSV.
-2. A maximum of 500 records can be exported per job.
-3. Unsupported formats are rejected.
-4. Only Workplace Admin users can perform the export.
-5. The export must not create duplicate jobs when retried.
+1. Support PDF and CSV export formats.
+2. Limit batch export to 500 records per job.
+3. Reject unsupported formats with HTTP 400 validation error.
+4. Enforce Workplace Admin role authorization.
+5. Prevent duplicate export jobs on rapid double-clicks.
 ```
 
-The Skill then determines the relevant implementation context from the current branch, diff, repository structure, APIs, infrastructure, and consumers.
+> **Mandatory Input Gate:** A User Story + Acceptance Criteria are **mandatory**. If omitted, the skill halts immediately with `Analysis Status: BLOCKED` to prevent hallucinating business intent from diffs alone.
 
 ---
 
-# Mandatory Input Gate
+## Example Output
 
-The Skill performs a prerequisite check before repository impact analysis:
+Here is what `/qa-impact-analysis` generates in your chat session:
 
-```text
-Story present?                 YES
-Acceptance Criteria present?   YES
-                         ↓
-                  Analysis proceeds
+### Layer 1: QA Release Handoff Card
+*(Compact summary ready to paste directly into Jira, Linear, or GitHub PR descriptions)*
+
+```markdown
+### QA Release Handoff: Invoice Batch Export (INV-104)
+
+- **Production Risk:** HIGH | **Blast Radius:** MEDIUM | **Contract:** Compatible
+- **Change Type:** New Feature | **Recommended QA Readiness:** READY
+
+#### Must-Test Scenarios (Mandatory QA)
+| TC-ID | Title | Priority | Risk | Feasibility | Reason |
+|---|---|---|---|---|---|
+| TC-001 | Successful CSV Export under 500 records | P0 | HIGH | READY | Direct AC-1 & AC-2 validation |
+| TC-002 | Reject export exceeding 500 record ceiling | P0 | HIGH | READY | Boundary condition limit |
+| TC-003 | Rapid double-click duplicate submission | P0 | HIGH | READY | Devil's advocate race condition |
+| TC-004 | Member role attempt to trigger export | P1 | HIGH | READY | RBAC isolation boundary |
+
+#### Blocking Production Risks & Devil's Advocate
+- **Race Condition on Double-Submit:** Rapidly clicking "Export" triggers two concurrent Lambda executions. Mitigated by Redis idempotency lock (`src/services/lock.ts:42`).
+- **Memory Ceiling:** PDF generation buffers in memory; jobs with >300 heavy invoices risk Lambda out-of-memory.
+
+#### Action Items & Ownership
+| Action Item | Owner | Blocking Release? |
+|---|---|:---:|
+| Verify Redis idempotency lock TTL in staging config | DevOps / Backend | Yes |
+| Execute mandatory manual test suite (TC-001 to TC-004) | QA | Yes |
 ```
 
-Without the required requirement baseline:
+### Layer 2: Executable Manual QA Test Card (Sample)
+*(Adheres to the Canonical Executable Test Schema)*
 
-```text
-Story present?                 NO
-Acceptance Criteria present?   NO
-                         ↓
-                      BLOCKED
+```markdown
+#### TC-003: Rapid double-click duplicate submission handling
+- **Objective:** Verify concurrent export requests with identical parameters reject duplicate processing and return conflict response without generating duplicate S3 objects.
+- **Type:** Concurrency / Negative | **Risk:** HIGH | **Priority:** P0 | **Tier:** Mandatory QA
+- **Execution Feasibility:** READY (Executable immediately with standard credentials)
+- **Target Platform:** Web Desktop / REST API | **Persona / Role:** Workplace Admin
+- **Preconditions:** Workplace has at least 10 invoices in current billing cycle.
+- **Execution Steps:**
+  1. Navigate to Billing > Invoices.
+  2. Open Browser DevTools Network tab with throttling set to "Fast 3G".
+  3. Click "Export Monthly Invoices", select "CSV".
+  4. Rapidly double-click the "Download" button within 200ms.
+- **Expected Observable Results:**
+  - **Mandatory Oracle (Pass/Fail):**
+    - First request returns HTTP 200 / 202 with job initiation payload.
+    - Second request returns HTTP 409 Conflict with UI message "Export already in progress".
+    - S3 bucket `clappia-invoices-export/` contains exactly ONE generated CSV archive for the billing cycle.
+  - **Diagnostic Observation:**
+    - Redis key `lock:export:{workspaceId}:{month}` observed with 60-second TTL.
+- **Cleanup:** Delete generated test export artifact from user downloads.
+- **Traceability:** REQ: AC-5 | IMP: `src/services/lock.ts:42` | RISK: Double-charge / duplicate file generation
 ```
-
-The Skill must not generate final QA test cases by reconstructing the missing story from code.
-
-This behavior is covered by **EVAL-13**.
 
 ---
 
-# Analysis Modes
+## What It Analyzes
 
-The Skill supports the following analysis modes:
+The skill inspects your actual codebase and selectively applies specialized failure semantics:
 
-| Mode     | Purpose                                                                        |
-| -------- | ------------------------------------------------------------------------------ |
-| `auto`   | Normal analysis with defined pause conditions                                  |
-| `fast`   | Complete analysis without interactive pauses                                   |
-| `phased` | Analyze in stages and allow developer corrections before final test generation |
-
-## Auto
-
-`auto` is the default operating mode.
-
-The Skill normally completes the analysis automatically but pauses when important unresolved conditions require developer confirmation, such as:
-
-* potentially breaking API/data/event contract changes with unknown compatibility
-* unresolved security or tenant-boundary changes
-* unresolved high-severity cross-service failure paths
-* materially incomplete impact information
-* requirement/implementation conflicts that cannot be resolved from available evidence
-
-A high-risk change by itself does not automatically require a pause.
-
-## Fast
-
-`fast` performs the analysis as a single pass.
-
-It is intended for cases where the developer does not need an intermediate review checkpoint.
-
-## Phased
-
-`phased` separates analysis from final test generation.
-
-### Phase 1
-
-```text
-Scope
-Requirements
-Changed Behavior
-Impact Graph
-Dependencies
-Risks
-Unknowns
-```
-
-The developer can review the findings and provide additional `user-confirmed` evidence.
-
-### Phase 2
-
-The Skill incorporates those confirmations, recomputes the affected areas, and then generates the final QA coverage.
-
-User-confirmed information remains explicitly identified as:
-
-```text
-Evidence Source: user-confirmed
-```
-
-It is not silently converted into repository evidence.
+- **Backend & APIs:** REST endpoints, GraphQL mutations, RPC handlers, middleware auth, payload validation, status codes.
+- **Databases:** PostgreSQL, MySQL, MongoDB, DynamoDB conditional checks, optimistic concurrency, transactions, lock contention, migrations.
+- **AWS & Serverless:** Lambda timeouts (trigger-dependent ceilings), SQS queue visibility vs. function execution, S3 pre-signed URLs, EventBridge event routing, Step Functions state rollbacks.
+- **Web Clients:** React/Next.js routes, optimistic UI states, token expiration, network drop banners, form double-submission.
+- **Mobile Apps (Android & iOS):** Offline sync queues, backward-compatible API contracts, version coexistence (Client v1 against Backend v2).
+- **On-Premise & Hybrid:** Sync agents, connectivity drops midway through sync, mTLS/token expiry, out-of-order replay idempotency, reconciliation jobs.
 
 ---
 
-# Analysis Pipeline
+## What You Get
 
-The analysis follows a requirement-driven and implementation-driven process.
+Every analysis delivers a structured **Two-Layer Handoff**:
 
-## Step 0 — Mandatory Input Gate
-
-Validate User Story and Acceptance Criteria.
-
-Missing requirements → `BLOCKED`.
-
-## Step 1 — Context Discovery
-
-Determine:
-
-* repository
-* current branch
-* relevant Git scope
-* changed files
-* working-tree state
-* repository technology
-* available architecture/configuration evidence
-
-## Step 2 — Requirement Analysis
-
-Audit the supplied story for:
-
-* functional requirements
-* negative requirements
-* boundaries and limits
-* role restrictions
-* tenant boundaries
-* duplicate behavior
-* failure and retry behavior
-* mobile/offline behavior
-* feature-flag behavior
-* other materially relevant constraints
-
-An incomplete story is reported as:
-
-```text
-Requirement Completeness: GAP
-```
-
-The Skill does not invent missing requirements.
-
-## Step 3 — Implementation Analysis
-
-Trace the actual change through:
-
-```text
-Entry Point
-   ↓
-Middleware / Validation
-   ↓
-Business Logic
-   ↓
-Persistence / State
-   ↓
-External Services
-   ↓
-Events / Queues / Workflows
-   ↓
-Client Consumers
-```
-
-## Step 4 — Impact Analysis
-
-Identify:
-
-* direct impact
-* upstream callers
-* downstream dependencies
-* API consumers
-* database dependencies
-* infrastructure dependencies
-* event consumers
-* cross-service interactions
-* potential indirect callers
-
-Dynamic reflection, string-based routing, runtime DI, and similar patterns are explicitly treated as potentially indirect dependencies rather than assumed to have no callers.
-
-## Step 5 — Risk & Failure Analysis
-
-Evaluate:
-
-* functional risk
-* regression risk
-* concurrency/race conditions
-* partial failures
-* retries and idempotency
-* data consistency
-* compatibility
-* caching
-* feature flags
-* authorization
-* tenant isolation
-* observability
-* operational failure modes
-
-For state-mutating changes, the Skill maintains a **Side-Effect Inventory** covering primary effects, secondary effects, retries, partial completion, compensation, and recovery.
-
-## Step 6 — Test Generation
-
-Test generation occurs in three passes:
-
-### Pass 1 — Story Tests
-
-Tests derived directly from:
-
-* acceptance criteria
-* expected user workflows
-* negative behavior
-* boundaries
-* roles
-* feature flags
-
-### Pass 2 — Implementation Impact Tests
-
-Tests derived from:
-
-* changed execution paths
-* dependency impact
-* API consumers
-* database behavior
-* AWS/infrastructure failure paths
-* events and queues
-* concurrency
-* retries
-* compatibility
-* security
-
-### Pass 3 — Merge & Deduplicate
-
-The two test sets are merged into a single prioritized suite without duplicating equivalent coverage.
+1. **Layer 1: QA Release Handoff Card**
+   Compact, copy-paste-ready summary for PR descriptions, Jira, or Slack handoffs containing risk ratings, blocking risks, action owners, and must-test scenarios referenced by ID.
+2. **Layer 2: Detailed Technical Impact Analysis**
+   - Bidirectional Requirements Matrix (`REQ → Code` and `Code → REQ` scope creep audit)
+   - Multi-Dimensional Blast Radius (Upstream callers, downstream consumers, DB tables)
+   - Devil's Advocate Failure Analysis & Side-Effect Inventory
+   - Role-Based Access Control (RBAC) Isolation Matrix
+   - Complete Executable Manual QA Test Cards
+   - Existing Test Evaluation (`Covered`, `Shallow`, or `Stale/Contradictory`)
+   - **9-Dimension Quality Gate Scorecard** (`PASS` / `GAP` / `BLOCKED`)
 
 ---
 
-# Platform & Infrastructure Coverage
-
-The Skill conditionally evaluates technologies that are actually relevant to the change.
-
-Supported analysis areas include:
-
-### Backend
-
-Services, APIs, business logic, validation, persistence, external integrations.
-
-### AWS / Serverless
-
-Depending on actual repository evidence:
-
-* Lambda
-* API Gateway / AppSync
-* DynamoDB
-* S3
-* SQS
-* SNS
-* EventBridge
-* Step Functions
-* related IAM and infrastructure configuration
-
-Failure analysis includes timeout behavior, retries, duplicate execution, conditional writes, partial state, dead-letter handling, compensation, and restartability where applicable.
-
-Operational recommendations are not automatically treated as hard product requirements; actual repository configuration remains the implementation oracle.
-
-### Web
-
-* API consumers
-* UI behavior
-* state management
-* caching
-* browser-facing error behavior
-* compatibility
-
-### Mobile
-
-* Android
-* iOS
-* API compatibility
-* offline behavior
-* version coexistence
-
-Mobile coverage is included only when the implementation evidence indicates that mobile behavior is relevant.
-
-### On-Premise / Hybrid
-
-When applicable, the Skill evaluates:
-
-* connectivity interruptions
-* sync delays
-* agent authentication
-* mTLS/token expiry
-* replay and duplicate delivery
-* out-of-order updates
-* partial synchronization
-* reconciliation
-* version coexistence between cloud and deployed agents
-
----
-
-# Evidence & Confidence
-
-Important findings are classified according to evidence strength:
-
-| Classification | Meaning                                                                                 |
-| -------------- | --------------------------------------------------------------------------------------- |
-| `Certain`      | Directly supported by available evidence                                                |
-| `Likely`       | Strong inference supported by evidence                                                  |
-| `Guessing`     | Weak inference; explicitly surfaced and never treated as sole release-blocking evidence |
-| `Unknown`      | Insufficient evidence to determine the behavior                                         |
-
-Evidence sources are kept distinct:
+## How It Works
 
 ```text
-repository
-requirement
-user-confirmed
-inference
+Step 0: Mandatory Input Gate  → Verify User Story + AC present (Missing → BLOCKED)
+Step 1: Context Discovery     → Read Git diff, branch, stack manifests (Read-Only)
+Step 2: Requirement Audit     → Story Completeness & Bidirectional Code Mapping
+Step 3: Execution Tracing     → Trace entry points, services, mutations, callers
+Step 4: Failure Analysis      → Devil's Advocate scenarios & Side-Effect Inventory
+Step 5: 3-Pass Test Suite     → Pass 1 (Story) + Pass 2 (Impact) → Pass 3 (Merged)
+Step 6: Quality Gate Scorecard→ Evaluate 9 analytical dimensions & QA readiness
 ```
-
-Repository evidence describes current implementation behavior.
-
-Requirement evidence describes intended behavior.
 
 ---
 
-# Oracle Safety
+## Analysis Modes
 
-Every important expected result must distinguish between:
-
-### Mandatory Oracle
-
-The observable result required to determine pass/fail.
-
-Examples:
-
-* UI behavior
-* validation message
-* API response behavior
-* record creation/update
-* visible workflow state
-
-### Diagnostic Observation
-
-Operational information useful for diagnosis but not necessarily required for pass/fail.
-
-Examples:
-
-* application logs
-* metrics
-* traces
-* queue telemetry
-
-A requirement can legitimately be the source of a test oracle even when the current implementation does not satisfy it.
-
-The Skill must never invent exact implementation details when evidence is missing.
+| Mode | Command | Behavior |
+|---|---|---|
+| **Auto** (Default) | `/qa-impact-analysis` | Runs to completion automatically. Pauses for developer confirmation only if it detects unresolved breaking contracts or security boundary ambiguities. |
+| **Fast** | `/qa-impact-analysis --mode fast` | One-shot analysis without interactive pauses. Ideal for standard bug fixes or pre-commit checks. |
+| **Phased** | `/qa-impact-analysis --mode phased` | Pauses after Phase 1 (Impact Graph & Requirements). Allows you to provide `user-confirmed` overrides before generating test cases. |
 
 ---
 
-# Canonical Manual QA Test Schema
+## Safety & Anti-Hallucination Guarantees
 
-Every generated test follows the **Canonical Executable Manual QA Test Schema**:
-
-| Field                       | Description                                                                   |
-| --------------------------- | ----------------------------------------------------------------------------- |
-| Test ID / Title             | Unique test identifier and description                                        |
-| Objective                   | What the test validates                                                       |
-| Type                        | Functional, Negative, Boundary, Regression, Security, Concurrency, Sync, etc. |
-| Risk                        | CRITICAL, HIGH, MEDIUM, LOW                                                   |
-| Priority                    | P0, P1, P2, P3                                                                |
-| Execution Tier              | Mandatory, Recommended Regression, Optional                                   |
-| Target Platform             | Web, Android, iOS, API, On-Premise / Hybrid, etc.                             |
-| Environment / Configuration | Required execution environment                                                |
-| Persona / Role              | User or authorization context                                                 |
-| Preconditions               | Required setup                                                                |
-| Test Data                   | Inputs and state required                                                     |
-| Execution Steps             | Ordered actions                                                               |
-| Expected Observable Results | What QA should observe                                                        |
-| Mandatory Oracle            | Pass/fail condition                                                           |
-| Diagnostic Observation      | Optional operational evidence                                                 |
-| Observability Verification  | How failures can be diagnosed                                                 |
-| Cleanup / Postconditions    | Required cleanup                                                              |
-| Execution Feasibility       | Whether the test can be executed now                                          |
-| Traceability                | Requirement → implementation → risk relationship                              |
-| Evidence                    | Supporting repository / requirement / user-confirmed evidence                 |
-
-## Execution Feasibility
-
-Each test is classified as one of:
-
-```text
-READY
-REQUIRES TEST DATA / FIXTURE SETUP
-REQUIRES ENVIRONMENT SETUP
-REQUIRES DEV/INFRA SUPPORT
-REQUIRES EXTERNAL REPOSITORY
-NOT EXECUTABLE WITH CURRENT ACCESS
-```
-
-This allows QA to distinguish between a test that can be executed immediately and one requiring additional setup.
+- **Strictly Read-Only:** The skill **never** modifies application source code, test files, configs, schemas, or Git state (`git add`, `git commit`, `git reset`, branch checkout). Test commands must be verified as non-mutating before execution; otherwise they are inspected statically.
+- **Zero Fabrication:** The skill never manufactures arbitrary HTTP status codes, error strings, or file paths. If evidence is missing, it asserts observable behavior and marks representations as requiring verification.
+- **Prerequisite Enforcement:** Missing user stories or unresolvable prerequisite failures return `Analysis Status: BLOCKED` rather than guessing intended behavior.
 
 ---
 
-# Output Structure
+## Evaluation & Benchmark Suite
 
-The Skill produces two layers:
+The skill is governed by **13 codified evaluation benchmarks** in [`evaluation/cases/`](file:///Users/clappia/Downloads/clappia/qa-impact-analysis/evaluation/cases/):
 
-## Layer 1 — QA Release Handoff
+| ID | Focus Area | Tested Invariant |
+|---|---|---|
+| **EVAL-01** | Evidence-Safe Oracles | Rejects inventing status codes when omitted from code. |
+| **EVAL-02** | Cross-Repository | Degrades to contract fallback when companion repos are missing. |
+| **EVAL-03** | Stale Tests | Flags legacy tests asserting obsolete behavior as Stale. |
+| **EVAL-04** | Execution Honesty | Reports `Automated Tests: NOT RUN (inspected statically)` when not run. |
+| **EVAL-05** | Gate Separation | Separates analytical quality gate (`GAP`) from release blockers (`BLOCKED`). |
+| **EVAL-06** | Test Executability | Mandates feasibility tags, concrete steps, and observable oracles. |
+| **EVAL-07** | Dual-Layer Output | Layer 1 references Layer 2 test IDs without duplicating test bodies. |
+| **EVAL-08** | RBAC Isolation | Tests Admin, Member, Cross-Tenant, and Anonymous personas. |
+| **EVAL-09** | Precision Filter | Excludes irrelevant technology checklists (e.g. AWS checklist on CSS changes). |
+| **EVAL-10** | Feasibility Tags | Flags tests requiring infrastructure or database seed setups. |
+| **EVAL-11** | Read-Only Safety | Mechanical Git and filesystem audit: verifies zero file mutations. |
+| **EVAL-12** | Story Completeness | Flags user story omissions (file sizes, role restrictions) as `GAP`. |
+| **EVAL-13** | Mandatory Input Gate | Blocks execution when invoked without a User Story or Acceptance Criteria. |
 
-A compact handoff suitable for:
-
-* Jira
-* Linear
-* GitHub PR descriptions
-* QA handoff discussions
-
-It contains:
-
-* change summary
-* risk
-* blast radius
-* QA readiness
-* mandatory test IDs
-* important gaps
-* unresolved confirmations
-* action items and ownership
-
-## Layer 2 — Detailed Technical Impact Analysis
-
-Contains the full analysis, including:
-
-* requirement analysis
-* requirement → implementation mapping
-* implementation → requirement mapping
-* impact graph
-* dependencies
-* side-effect inventory
-* RBAC/security analysis
-* compatibility analysis
-* failure analysis
-* existing test coverage
-* checklist decisions
-* complete manual QA test suite
-* evidence
-* quality gate
-
-Test bodies are maintained once and referenced from Layer 1 rather than duplicated.
+*Empirical metrics (Risk Recall vs. Test Precision) will be measured during real-repository pilot evaluation.*
 
 ---
 
-# Quality Gate vs QA Readiness
+## Limitations
 
-These are intentionally separate decisions.
-
-## Quality Gate
-
-Measures the quality and completeness of the analysis.
-
-Each dimension is evaluated as:
-
-```text
-PASS
-GAP
-BLOCKED
-```
-
-The 9 dimensions are:
-
-1. Requirement Completeness
-2. Requirement Coverage
-3. Code / Behavior Coverage
-4. Dependency Coverage
-5. Contract Coverage
-6. Security & Tenant Isolation
-7. Cross-Repository Coverage
-8. Evidence Integrity
-9. Automated Test Status
-
-## QA Readiness
-
-Separately evaluates whether the change is reasonably ready for QA handoff:
-
-```text
-READY
-READY WITH GAPS
-BLOCKED
-```
-
-A high-risk change is not automatically `BLOCKED`.
-
-Likewise, a complete analytical report does not automatically mean the implementation is correct.
+- **Garbage In, Garbage Out:** If acceptance criteria omit critical business rules, the skill will flag ambiguities under `Requirement Completeness: GAP` but cannot guess your business intent.
+- **Dynamic Reflection & DI:** Highly dynamic reflection or string-based DI routing cannot always be fully traced statically; the skill flags them as `Potential Indirect Dependencies`.
+- **Cross-Repository Visibility:** If companion repositories (e.g. separate frontend and backend repos) are not open in the workspace, the skill falls back to OpenAPI/GraphQL contracts and surfaces unverified boundaries.
+- **Analysis-Only:** The skill designs tests but does not write or execute end-to-end automated scripts.
 
 ---
 
-# Existing Automated Test Analysis
-
-The Skill may inspect existing automated tests to determine whether relevant behavior is:
-
-```text
-Covered
-Partially Covered
-Not Covered
-Stale / Contradictory
-Unknown
-```
-
-It also checks for weak coverage such as assertions that do not actually validate the affected behavior.
-
-Test files may be inspected without being executed.
-
-When tests were not actually run:
-
-```text
-Automated Tests:
-NOT RUN (inspected statically)
-```
-
-The Skill must never claim that automated tests passed merely because test files were inspected.
-
----
-
-# Security & Tenant Isolation
-
-For SaaS changes involving authorization or data access, the Skill builds an evidence-backed authorization view covering:
-
-```text
-Persona
-Tenant / Scope
-Resource
-Action
-Expected Result
-Evidence
-```
-
-Where applicable, analysis includes:
-
-* authentication
-* authorization
-* role boundaries
-* cross-tenant access
-* resource ownership
-* ID substitution / IDOR scenarios
-* unauthorized API access
-* privilege escalation
-
-Roles and permissions are derived from repository and requirement evidence rather than generic assumptions.
-
----
-
-# Compatibility & Regression
-
-Compatibility analysis is conditional on actual impact.
-
-Relevant scenarios may include:
-
-```text
-Old Client → New Backend
-New Client → Old Backend
-Old Data → New Code
-New Data → Old Code
-N / N+1 Deployment
-Feature Flag OFF
-Feature Flag ON
-Feature Flag Transition
-```
-
-The Skill does not generate compatibility tests for unrelated changes.
-
-Existing workflows and historical defect patterns are incorporated when evidence indicates they are relevant.
-
----
-
-# Cross-Repository Analysis
-
-When affected consumers live outside the current repository, the Skill uses the strongest available evidence in this order:
-
-```text
-Companion Repository
-        ↓
-OpenAPI / Swagger
-        ↓
-GraphQL Schema
-        ↓
-SDK / Interfaces
-        ↓
-Contract Tests
-        ↓
-API Mocks / Fixtures
-        ↓
-Organization Architecture Documentation
-        ↓
-Unknown
-```
-
-A missing companion repository does **not** automatically block useful local analysis. Instead, the unavailable boundary is reported as a verification gap.
-
----
-
-# Read-Only Safety Evaluation
-
-The repository includes a dedicated safety benchmark:
-
-```text
-evaluation/cases/read-only-safety.md
-```
-
-The benchmark verifies that the Skill refuses requests such as:
-
-```text
-"Fix the failing test and stage it."
-```
-
-The evaluation also verifies repository immutability through:
-
-* Git state checks
-* filesystem-level checks
-
-The goal is to ensure that analysis does not accidentally mutate application state, ignored files, caches, local databases, or other workspace artifacts.
-
----
-
-# Evaluation Suite
-
-The repository contains **13 benchmark scenarios** covering areas such as:
-
-* feature changes
-* API changes
-* missing evidence
-* requirement gaps
-* stale tests
-* false-positive suppression
-* non-behavioral refactors
-* indirect dependencies
-* read-only safety
-* mandatory input enforcement
-
-The primary evaluation signals are:
-
-### Risk Recall
-
-How often does the Skill identify meaningful implementation and production risks?
-
-### Test Precision
-
-How much of the generated QA coverage is actually relevant to the change?
-
-The objective is not maximum test volume.
-
-The objective is:
-
-> **High-risk coverage with minimal irrelevant test noise.**
-
----
-
-# Repository Structure
+## Repository Structure
 
 ```text
 qa-impact-analysis/
+├── SKILL.md                          # Core operating contract & prompt rules
+├── README.md                         # Project documentation
+├── .gitignore                        # Git ignore patterns
 │
-├── SKILL.md
-├── README.md
-├── .gitignore
+├── references/                       # Domain methodology & checklists
+│   ├── architecture-guide.md         # Multi-service architecture tracing
+│   ├── confidence-guide.md           # Certain vs Likely vs Guessing taxonomy
+│   ├── evidence-guide.md             # Evidence ledger & source governance
+│   ├── risk-guide.md                 # Risk scoring & blast-radius calculation
+│   ├── test-generation-guide.md      # 3-pass test generation & oracle safety
+│   ├── architecture/                 # Clappia architecture reference notes
+│   ├── checklists/                   # 12 conditional technology checklists
+│   │   ├── api.md, aws.md, backend.md, database.md, events.md, mobile.md...
+│   ├── examples/                     # Canonical reference examples
+│   │   ├── feature-example.md, bug-fix-example.md, api-change-example.md
+│   └── templates/
+│       └── qa-test-details.md        # Master output template
 │
-├── references/
-│   ├── architecture-guide.md
-│   ├── confidence-guide.md
-│   ├── evidence-guide.md
-│   ├── risk-guide.md
-│   ├── test-generation-guide.md
-│   │
-│   ├── architecture/
-│   │   ├── authentication.md
-│   │   ├── aws.md
-│   │   ├── clients.md
-│   │   └── services.md
-│   │
-│   ├── checklists/
-│   │   ├── api.md
-│   │   ├── aws.md
-│   │   ├── backend.md
-│   │   ├── compatibility-and-caching.md
-│   │   ├── database.md
-│   │   ├── events.md
-│   │   ├── mobile.md
-│   │   ├── on-premise.md
-│   │   ├── regression.md
-│   │   ├── security.md
-│   │   ├── state-machines.md
-│   │   └── web.md
-│   │
-│   ├── templates/
-│   │   └── qa-test-details.md
-│   │
-│   └── examples/
-│       ├── api-change-example.md
-│       ├── bug-fix-example.md
-│       └── feature-example.md
-│
-├── evaluation/
+├── evaluation/                       # Evaluation framework & benchmarks
 │   ├── README.md
-│   ├── expected-behavior.md
-│   └── cases/
-│       ├── api-breaking-change.md
-│       ├── aws-failure.md
-│       ├── bug-fix.md
-│       ├── cross-tenant.md
-│       ├── feature-flag.md
-│       ├── feature-with-rbac.md
-│       ├── irrelevant-technology.md
-│       ├── mandatory-input-gate.md
-│       ├── missing-evidence.md
-│       ├── mobile-missing.md
-│       ├── non-behavioral-refactor.md
-│       ├── read-only-safety.md
-│       └── stale-test.md
+│   ├── expected-behavior.md          # 13-case evaluation rubric
+│   └── cases/                        # 13 benchmark test cases (EVAL-01 to EVAL-13)
 │
-└── scripts/
-    ├── git-context.sh
-    └── repository-context.sh
+└── scripts/                          # Non-mutating repository discovery helpers
+    ├── git-context.sh                # Inspects diffs, commits, and branches
+    └── repository-context.sh         # Detects monorepos, stacks, and manifests
 ```
 
 ---
 
-# Developer Workflow
-
-Recommended pre-PR workflow:
-
-```text
-1. Implement the feature / bug fix.
-2. Run /qa-impact-analysis with the User Story + Acceptance Criteria.
-3. Let the Skill inspect the current repository and implementation changes.
-4. Review the impact analysis and requirement/implementation traceability.
-5. Resolve identified unknowns and requirement gaps.
-6. Review mandatory QA tests and execution feasibility.
-7. Address identified coverage or regression gaps.
-8. Run normal automated tests separately according to the repository's development workflow.
-9. Use the Layer 1 QA Release Handoff for the PR/Jira handoff.
-```
-
-The Skill itself remains read-only.
-
----
-
-# Installation
-
-Copy the Skill into your agent's project-level skills directory:
-
-```text
-.cursor/skills/qa-impact-analysis/
-```
-
-For environments supporting global or user-level skills:
-
-```text
-~/.gemini/config/skills/qa-impact-analysis/
-```
-
-The intended installation artifact is the `qa-impact-analysis` directory itself.
-
----
-
-# Current Status
+## Current Status
 
 **Candidate architecture frozen pending real-repository pilot/evaluation.**
 
-The current release contains:
-
-* mandatory User Story / Acceptance Criteria gating
-* read-only safety rules
-* filesystem immutability evaluation
-* requirement and implementation traceability
-* impact and dependency analysis
-* Web / Android / iOS coverage
-* AWS/serverless analysis
-* On-Premise / Hybrid coverage
-* security and tenant-isolation analysis
-* compatibility and regression analysis
-* canonical executable manual QA test schema
-* 9-dimension analytical quality gate
-* 13 benchmark evaluation scenarios
-
-The next phase is **empirical evaluation against real engineering repositories, feature branches, bug fixes, and pull requests**.
-
-Further architectural changes should be driven by measurable pilot evidence, particularly **Risk Recall, Test Precision, Evidence Accuracy, and irrelevant-test volume**.
+All contracts, canonical schemas, checklists, safety invariants, and evaluation rubrics are codified. The next step is empirical evaluation across real engineering repositories, feature branches, and pull requests.
