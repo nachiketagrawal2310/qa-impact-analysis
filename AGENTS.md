@@ -11,7 +11,7 @@ Before using ANY tool, reading ANY file (including `SKILL.md`), inspecting Git s
    - A concrete bug description (with expected vs. actual behavior or specific failure scenario), OR
    - A specific functional change request.
 
-2. **If the prompt lacks an actionable behavioral requirement (e.g., only "test changes in this branch", a branch name, commit message, PR title, or ungrounded "test this code"):**
+2. **If the prompt lacks an actionable behavioral requirement or is insufficiently specific to determine validation scope (e.g., only "test changes in this branch", a branch name, commit message, PR title, ungrounded "test this code", or a vague "login fails" without trigger, failure scenario, or error context):**
    - **STOP IMMEDIATELY.**
    - **DO NOT INVOKE ANY TOOL.** (Do NOT call `view_file`, `run_command`, `read_browser_page`, etc.)
    - **Do NOT inspect `SKILL.md`.**

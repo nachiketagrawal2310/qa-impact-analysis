@@ -17,7 +17,7 @@ Before using ANY tool, reading ANY repository file, inspecting Git state, listin
    - A concrete bug description (with expected vs. actual behavior or specific failure scenario), OR
    - A specific functional change request.
 
-2. **If the prompt lacks an actionable behavioral requirement (e.g., only "test changes in this branch", a branch name, commit message, PR title, or ungrounded "test this code"):**
+2. **If the prompt lacks an actionable behavioral requirement or is insufficiently specific to determine validation scope (e.g., only "test changes in this branch", a branch name, commit message, PR title, ungrounded "test this code", or a vague "login fails" without trigger, failure scenario, or error context):**
    - **STOP IMMEDIATELY.**
    - **DO NOT INVOKE ANY TOOL.** (Do NOT call `view_file`, `run_command`, `read_browser_page`, `list_dir`, etc.)
    - **Do NOT inspect SKILL.md further.**
@@ -326,14 +326,16 @@ When invoked in Default Mode, the skill outputs **ONLY** the following contract:
 
 - [Environment prerequisites, e.g. "Requires Prod-like staging environment with active CloudWatch Alarms."]
 - [Multi-tenant prerequisites, e.g. "Requires two separate workplace tenants to verify cross-tenant data isolation."]
-- [Scope note when omission might otherwise confuse QA, e.g. "**Scope Note:** No mobile-specific cases included; no affected mobile consumer was identified."]
+- **Scope Note (Platform & Boundary Exclusions):** If a platform or layer (e.g. mobile, backend worker) is excluded based on evidence, omit its test cases from the default output and include a brief Scope Note when the exclusion could reasonably be expected by QA (e.g., `**Scope Note:** No mobile-specific cases included; no affected mobile consumer was identified from the available evidence.`). Never silently drop platforms if QA would reasonably expect coverage.
 ```
 
 ---
 
 ## 7. Full Mode Contract (`--full`)
 
-When invoked with `--full` or a request for full analysis, the skill outputs the complete Dual-Layer Technical Impact Analysis report:
+When invoked with `--full` or a request for full analysis, the skill outputs the complete Dual-Layer Technical Impact Analysis report.
+
+**Relevance-Filtered Depth:** While Full Mode is comprehensive, it must NOT generate speculative analysis that has no consequence for testing, release risk, or developer action. All user-facing Full Mode content must remain strictly grounded and relevance-filtered to preserve signal-to-noise ratio. Full Mode MUST retain executable manual test cases (Audited QA Test Cards in Section 8); technical analysis must NEVER replace the test cases themselves.
 
 ```markdown
 # QA Impact Analysis: [Feature / Bug Fix / Task Title]
