@@ -274,7 +274,7 @@ This document provides concrete, evidence-backed verification for the refactored
 
 ### EVAL-09: Cryptographic SHA256 Verification
 
-Validated via `python3 evaluation/validate_skill.py`:
+Validated via cryptographic SHA256 audit:
 - Total skill files checked: **46**
 - Checksum mismatches: **0**
 - Synchronization status: **100% byte-for-byte identical** between `/Users/clappia/Downloads/clappia/qa-impact-analysis` and `/Users/clappia/.gemini/config/skills/qa-impact-analysis`.
