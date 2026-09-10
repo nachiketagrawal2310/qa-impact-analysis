@@ -8,7 +8,7 @@ description: |
 disable-model-invocation: false
 ---
 
-# P0 — MANDATORY PRE-TOOL INPUT GATE
+# P0 — MANDATORY PRE-TOOL INPUT GATE (ZERO-TOOL BARRIER)
 
 Before using ANY tool, reading ANY repository file, inspecting Git state, listing directories, or executing ANY command:
 
@@ -16,40 +16,40 @@ Before using ANY tool, reading ANY repository file, inspecting Git state, listin
    - User Story / Business Requirement
    - Acceptance Criteria
 
-2. **If either is missing, vague, or not explicitly provided:**
-   - **STOP immediately.**
-   - **Do NOT invoke any tool.**
+2. **If either is missing, vague, or not explicitly provided (e.g., only "test changes in this branch", a branch name, commit message, or PR title):**
+   - **STOP IMMEDIATELY.**
+   - **DO NOT INVOKE ANY TOOL.** (Do NOT call `view_file`, `run_command`, `read_browser_page`, `list_dir`, etc.)
    - **Do NOT inspect SKILL.md further.**
-   - **Do NOT inspect the repository.**
-   - **Do NOT inspect Git status, branch, diff, commits, files, or directories.**
+   - **Do NOT inspect the repository or Git state.**
    - **Do NOT infer requirements from implementation evidence.**
    - **Do NOT generate REQ-* identifiers.**
    - **Respond immediately with:**
-     ```markdown
-     ## 🛑 Analysis Status: BLOCKED (Prerequisite Failure)
 
-     **Reason:** Missing mandatory User Story and Acceptance Criteria.
+```markdown
+## 🛑 Analysis Status: BLOCKED (Prerequisite Failure)
 
-     The QA Impact Analysis skill strictly operates from business requirements to implementation changes. It will NOT infer or reverse-engineer intended business behavior from:
-     - Git diffs or modified code
-     - Commit messages or branch names
-     - PR titles
-     - Inline code comments or TODOs
+**Reason:** Missing mandatory User Story and Acceptance Criteria.
 
-     To generate accurate, requirement-grounded QA test details, please provide:
+The QA Impact Analysis skill strictly operates from business requirements to implementation changes. It will NOT infer or reverse-engineer intended business behavior from:
+- Git diffs or modified code
+- Commit messages or branch names
+- PR titles
+- Inline code comments or TODOs
 
-     ### Required Input:
-     1. **User Story / Business Requirement:** (e.g., *"As a user, I want..."*)
-     2. **Acceptance Criteria:**
-        - Primary happy-path workflow
-        - Negative conditions and validation rules
-        - Role/tenant permissions and limits
-     3. **Out of Scope (Optional):** (e.g., *"Llama models are out of scope"*)
-     ```
+To generate accurate, requirement-grounded QA test details, please provide:
+
+### Required Input:
+1. **User Story / Business Requirement:** (e.g., *"As a user, I want..."*)
+2. **Acceptance Criteria:**
+   - Primary happy-path workflow
+   - Negative conditions and validation rules
+   - Role/tenant permissions and limits
+3. **Out of Scope (Optional):** (e.g., *"Llama models are out of scope"*)
+```
    - **HALT EXECUTION IMMEDIATELY.**
 
-3. **If PRESENT:**
-   - Proceed to Critical Rules and Step 1 (Scope & Context Determination).
+3. **Only if BOTH User Story and Acceptance Criteria are explicitly present in the user prompt:**
+   - Proceed to Section 1 (Critical Rules) and Section 2 (Input & Scope Gate).
 
 This gate has absolute precedence over every other instruction in this Skill.
 
@@ -63,7 +63,9 @@ Act as a senior QA architect and senior software engineer performing evidence-ba
 Analyze the implementation deeply across code, dependencies, cloud/AWS infrastructure, databases, and client boundaries, but **output only executable manual QA test details unless the user explicitly requests full analysis.**
 Keep the intelligence; hide the verbosity. All analytical reasoning (blast radius, side effects, RBAC matrix, devil's advocate, checklist decisions, static test coverage) occurs internally to produce high-recall, execution-ready test cases.
 
-## Critical rules
+---
+
+## 1. Critical Rules
 
 1. **READ-ONLY APPLICATION REPOSITORY MANDATE (HARD SAFETY RULE).** 
    The skill operates strictly in read-only analysis mode. The agent **MUST NOT**:
@@ -82,7 +84,7 @@ Keep the intelligence; hide the verbosity. All analytical reasoning (blast radiu
    **Existing automated tests are evaluated 100% via STATIC FILE INSPECTION.** Always report: `Automated Tests: NOT RUN (inspected statically)`.
 2. **NO FABRICATION.** Never invent file paths, line numbers, symbols, dependencies, consumers, infrastructure resources, configuration values, test results, or runtime behavior. If evidence cannot be located, state `UNKNOWN` and explain what must be verified.
 3. **MISSED-RISK REDUCTION > OUTPUT LENGTH.** Prefer high-value, execution-ready test cases over generic test volume. Maintain high recall for real risks while preserving precision against irrelevant test spam.
-4. **INTERNAL EVIDENCE LEDGER FIRST.** Internally build `Finding → Evidence → Confidence → Risk → Test` before drafting tests. Maintain this ledger in internal reasoning; do NOT expose internal IDs (`IMP-*`, `RISK-*`, `REQ-*`) in default output.
+4. **INTERNAL EVIDENCE LEDGER FIRST.** Internally build `Finding → Evidence → Confidence → Risk → Test` before drafting tests. Maintain this ledger strictly in internal thought/reasoning; do NOT expose internal IDs (`IMP-*`, `RISK-*`, `REQ-*`) in default output.
 5. **EVIDENCE BEFORE INFERENCE.** Repository evidence is stronger than organizational knowledge, which is stronger than general inference. Never present inference as confirmed fact.
 6. **CONFIDENCE GOVERNANCE.** 
    - `[Certain]` = directly supported by repository evidence.
@@ -108,11 +110,13 @@ Keep the intelligence; hide the verbosity. All analytical reasoning (blast radiu
     6. API mocks / test fixtures / snapshots
     7. Organization architecture (`references/architecture/`)
     8. Explicitly declare as unverified external risk
-11. **TWO OUTPUT CONTRACTS (DEFAULT TEST DETAILS VS. FULL ANALYSIS):**
-    - **Default Mode (`test-details`):** Output ONLY **QA Test Details (Executable Manual Test Cases)**. Keep all internal analysis (scope, risk, handoff card, blast radius, side effects, RBAC matrix, compatibility, devil's advocate, existing coverage, quality gate scorecard) strictly internal. Output adheres to Template 1 in `references/templates/qa-test-details.md`.
-    - **Full Mode (`--full`):** Output the complete Dual-Layer Technical Impact Analysis report adheres to Template 2 in `references/templates/qa-test-details.md`.
-    - **Phased Mode (`--phased`):** Output Phase 1 Checkpoint (Requirement + Scope + Confirmed Impact) using Template 3, STOP for developer review/overrides, then output Phase 2 QA Test Details using Template 4 upon confirmation.
-12. **NO DUPLICATE TEST BODIES.** Define full step-by-step test instructions only once. In `--full` mode, summary tables reference test cases by `TC-ID`.
+11. **STRICT ZERO-REASONING-NARRATIVE IN DEFAULT OUTPUT.**
+    In default mode, do NOT output architecture analysis, dependency graphs, risk matrices, evidence ledgers, checklist decisions, internal finding IDs (`IMP-*`, `RISK-*`, `REQ-*`), or step-by-step reasoning narrative. Use those internally to improve the test cases. Default output must contain only information required to execute or understand the test cases.
+12. **SELF-CONTAINED TEST EXECUTION CONTRACT & HARD LENGTH QUALITY RULE.**
+    A QA engineer who has only the generated Test Details and the stated prerequisites must be able to execute the test without reading the developer's code or the Skill's internal analysis.
+    - Every test must include concrete `Feasibility` (`Manual` / `Requires test data` / `Requires developer support` / `Requires environment access`).
+    - **Do NOT expose implementation-derived call chains unnecessary for execution** (e.g. do not write `UserService.getUserData() → DynamoDB UserTable → getItem()`; instead write: *"Request a non-existent user ID; verify API returns 404 Not Found and event is logged as WARN"*).
+    - Prefer fewer high-value tests over long explanatory sections.
 13. **SEPARATE QUALITY GATE FROM QA READINESS.**
     - **Quality Gate (`PASS` / `GAP` / `BLOCKED`):** Evaluates analytical completeness and evidence integrity.
     - **Recommended QA Readiness (`READY` / `READY WITH GAPS` / `BLOCKED`):** Evaluates whether the code change is reasonably safe to hand off to QA testing. (A feature with an implementation bug can be `READY` for QA testing to expose the bug).
@@ -124,254 +128,458 @@ Keep the intelligence; hide the verbosity. All analytical reasoning (blast radiu
     - **Do NOT** generate final QA test details.
     - **Do NOT** guess, infer, or hallucinate user intent from code changes alone, and **DO NOT synthesize `REQ-XX` items from Git diffs, commits, PR titles, or code comments**.
     - **Immediately respond with `Analysis Status: BLOCKED`** and request the developer to supply the User Story and Acceptance Criteria using the structured input template.
-15. **STRICT ZERO-REASONING-NARRATIVE IN DEFAULT OUTPUT.**
-    In default mode, do NOT output architecture analysis, dependency graphs, risk matrices, evidence ledgers, checklist decisions, internal finding IDs (`IMP-*`, `RISK-*`, `REQ-*`), or step-by-step reasoning narrative. Use those internally to improve the test cases. Default output must contain only information required to execute or understand the test cases.
-16. **SELF-CONTAINED TEST EXECUTION CONTRACT & HARD LENGTH QUALITY RULE.**
-    A QA engineer who has only the generated Test Details and the stated prerequisites must be able to execute the test without reading the developer's code or the Skill's internal analysis. Every test must include concrete `Feasibility` (`Manual` / `Requires test data` / `Requires developer support` / `Requires environment access`). Prefer fewer high-value tests over long explanatory sections.
 
 ---
 
-## Invocation Model & Execution Modes
+## 2. Input / Context Gate
 
-### Invocation Model
-- **User Story & Acceptance Criteria:** **MANDATORY**. The developer must provide the ticket description, user story, or acceptance criteria at invocation.
-- **Implementation Context:** **OPTIONAL / AUTO-DETECTED**. The skill automatically inspects the local Git branch, staged/unstaged changes, and repository manifests using `scripts/git-context.sh` and `scripts/repository-context.sh`. The developer may optionally supply custom branch diffs or specific file paths if analyzing a target different from active workspace state.
-
-### Primary Output Modes & Invocations
-- **Default Mode (`test-details`):** 
-  - **Triggers:** `/qa-impact-analysis` (canonical invocation), or standard requests to generate QA test details.
-  - **Behavior:** Executes the comprehensive internal analysis pipeline across code, cloud infrastructure, databases, client boundaries, security, and regressions, but outputs **ONLY QA Test Details (Executable Manual Test Cases)** using Template 1 in `references/templates/qa-test-details.md`.
-  - **Constraint:** Zero narrative, zero internal IDs, zero confidence tags.
-- **Full Mode (`--full`):** 
-  - **Triggers:** `/qa-impact-analysis --full`, or natural language: *"Give me the full impact analysis"*, *"Show me why these tests were selected"*, *"Show technical impact report"*.
-  - **Behavior:** Outputs the complete Dual-Layer Technical Impact Analysis report using Template 2 in `references/templates/qa-test-details.md`: Scope & Inspected Evidence + Layer 1 QA Release Handoff + Layer 2 Detailed Technical Impact Analysis (Coverage Matrix, Checklist Decisions, Blast Radius, Side Effects, RBAC Matrix, Compatibility, Devil's Advocate, Existing Test Evaluation, Traceable QA Test Cards, Quality Gate Scorecard).
-- **Phased Mode (`--phased`):** 
-  - **Triggers:** `/qa-impact-analysis --phased`, or natural language: *"Do phased analysis"*, *"Step by step impact review"*.
-  - **Behavior:** Enforces an interactive checkpoint after Phase 1 using Template 3 in `references/templates/qa-test-details.md`:
-    - **Phase 1 Deliverable:** **Requirement Understanding + Detected Change Scope + Confirmed Impact Graph**.
-    - **STOP:** The skill halts and prompts the developer to review and provide corrections to either scope (e.g. *"You missed ReportingService"*) or business requirements (e.g. *"Expected behavior is 404, not 400"*).
-    - **Phase 2 Deliverable:** Upon receiving developer feedback, records findings as `[User-Confirmed]`, recomputes risks, and generates the final QA test details using Template 4 in `references/templates/qa-test-details.md`.
-
-### Interaction Control Flags
-- **`--mode fast`**: One-shot execution. Analyzes context and generates output without pausing for non-critical ambiguities.
-- **`--mode auto` (Default interaction control)**: Executes automatically through to the final deliverable, but **pauses for developer confirmation** if an unresolved contract contradiction or high-severity ambiguity directly prevents sound test generation.
+Before performing repository inspection:
+1. **User Story & Acceptance Criteria Validation:** Verify both are present in the invocation prompt. If missing, halt immediately per P0 Gate.
+2. **Context Discovery (Read-Only):**
+   - Discover Git branch, base branch, and commit range using `scripts/git-context.sh`.
+   - Inspect repository manifests and tech stack using `scripts/repository-context.sh`.
+   - Read working tree status (`git status --porcelain`).
+   - Identify changed files (source, infrastructure, tests, schemas).
+3. **Out-of-Scope Boundary Enforcement:** Explicitly record any items declared out of scope by the User Story (e.g., *"Llama models are out of scope"*). The agent MUST NOT generate test cases for out-of-scope items.
 
 ---
 
-## Analysis workflow
+## 3. Analysis Workflow
 
-### 0. Mandatory Input Gate Check
+The skill executes this systematic 10-step analysis pipeline internally:
 
-Evaluate the user's invocation input before any repository inspection:
-1. **Check for User Story & Acceptance Criteria:**
-   - Did the user supply a User Story, Jira/ticket description, or explicit Acceptance Criteria?
-2. **If MISSING:**
-   - **Halt immediately.**
-   - Output:
-     ```markdown
-     ## 🛑 Analysis Status: BLOCKED (Prerequisite Failure)
+1. **Scope & Context Determination:** Map modified files, services, infrastructure templates, and API definitions.
+2. **Story Completeness & Ambiguity Audit:** Audit provided acceptance criteria for missing constraints (payload limits, concurrency, rate ceilings). Flag ambiguities as `Requirement Completeness: GAP` internally.
+3. **Bidirectional Requirement ↔ Code Audit:**
+   - *Requirement → Code:* Did the implementation fulfill all acceptance criteria?
+   - *Code → Requirement:* Did the code introduce unrequested behavior or scope creep?
+4. **Execution Tracing:** Trace behaviorally relevant symbols:
+   `Entry Point (Route/Event/Job) → Middleware/Auth → Service Logic → State Mutations/External Calls → Response/Side Effects → Consumers`
+5. **Conditional Technology Checklists:** Evaluate checklists based on diff evidence (`api.md`, `database.md`, `aws.md`, `events.md`, `security.md`, `mobile.md`, `web.md`, `on-premise.md`, etc.).
+6. **Multi-Dimensional Blast Radius & Side-Effect Inventory:**
+   - Upstream callers, downstream consumers, database mutations, background events.
+   - Partial failure behavior, retry idempotency, compensation/rollback mechanisms.
+7. **RBAC & Tenant Isolation Analysis:** Evaluate permissions across Workplace Admin, Member, Cross-Tenant, and Anonymous personas.
+8. **Compatibility & Rollout Analysis:** Rolling deployment compatibility ($N$ / $N+1$), caching, and feature flag states (OFF, ON, toggle).
+9. **Devil's Advocate Failure Analysis:** Formulate concrete failure hypotheses (race conditions, double-submits, timeout ceilings, silent error swallowing).
+10. **Static Test Suite Evaluation:** Statically evaluate existing automated tests (`Covered`, `Partially Covered / Shallow`, `Not Covered`, `Stale / Contradictory`). Report: `Automated Tests: NOT RUN (inspected statically)`.
 
-     **Reason:** Missing mandatory User Story and Acceptance Criteria.
+---
 
-     To generate accurate, requirement-grounded QA test details and avoid hallucinating business intent from code diffs alone, please provide:
+## 4. Internal Evidence, Risk & Coverage Model
 
-     ### Required Input:
-     1. **User Story / Business Requirement:** (e.g., *"As a workplace admin, I want to export monthly invoices to PDF/CSV..."*)
-     2. **Acceptance Criteria:**
-        - Primary happy-path workflow
-        - Negative conditions and validation rules
-        - Role/tenant permissions and limits
-     3. **Out of Scope (Optional):** (e.g., *"Llama models are out of scope"*)
-     ```
-   - **DO NOT** execute Git blast-radius inspection or generate QA test cases.
-3. **If PRESENT:**
-   - Proceed to Step 1 (Scope & Context Determination).
+The skill maintains a rigorous internal analytical model:
 
-### 1. Mandatory Scope & Context Determination
+```text
+                  INTERNAL (Silent Reasoning)
+User Story / AC
+       ↓
+Code Change Analysis (Diff + Ast)
+       ↓
+Dependency & Call Tracing
+       ↓
+AWS / DB / State Machine Analysis
+       ↓
+Client Impact (Web / Android / iOS / On-Premise)
+       ↓
+Security & Tenant Boundary Analysis
+       ↓
+Regression & Devil's Advocate Hypotheses
+       ↓
+Internal Evidence Ledger (Finding → Evidence → Confidence → Risk → Test)
+       ↓
+Traceability Matrix (REQ-ID → IMP-ID → RISK-ID)
+       │
+       ▼
+ ┌────────────────────────────────────────────────────────┐
+ │                   OUTPUT SELECTION                     │
+ │                                                        │
+ │  Default Mode  → Output ONLY QA Test Details           │
+ │  --full        → Expose internal analysis + test cards │
+ │  --phased      → Expose Phase 1 checkpoint, then tests │
+ └────────────────────────────────────────────────────────┘
+```
 
-Explicitly report the **Analysis Scope**:
-- **Repository:** Name/directory of current workspace repository.
-- **Git Scope:** Base branch vs current branch / commit range.
-- **Working Tree:** Must report exact status from `git status --porcelain`. If pre-existing unstaged/untracked files exist (e.g. in test suites), report honestly: `DIRTY ([N] pre-existing uncommitted files detected in working tree; preserved untouched)`. Never claim "clean and untouched" if working tree contains changes.
-- **Inspected Evidence:** Count and paths of changed source files, infrastructure files, test files, and API schemas.
-- **Not Inspected / Unavailable:** Companion repositories (e.g., Android, iOS, external microservices) or unverified production configurations.
-- **Out-of-Scope Items:** Explicitly record any items declared out of scope by the User Story (e.g., *"Llama models are out of scope"*). The agent MUST NOT generate test cases for out-of-scope items.
-- **Analysis Status:**
-  - `COMPLETE`: Repository, diff, and relevant contracts fully available.
-  - `PARTIAL`: Missing companion repos or unmerged dependencies, but core diff analyzed.
-  - `BLOCKED`: A prerequisite prevents meaningful analysis (e.g., repository cannot be accessed, missing mandatory user story, or no code diff available for a code-specific request).
-- **Confidence Level:** `HIGH`, `MEDIUM`, or `LOW` with clear rationale.
+This internal model is the quality engine that ensures tests are concrete, non-generic, and cover high-severity failure modes, but its analytical artifacts are **NOT dumped to the user by default**.
 
-### 2. Story Completeness & Bidirectional Alignment
+---
 
-#### A. Story Completeness & Ambiguity Audit
-Because the User Story was validated as present in Step 0, audit the provided story for material omissions or edge-case gaps:
-- Are allowed file types / payload formats defined?
-- Are maximum size, volume, or rate ceilings specified?
-- Are user role / permission restrictions stated?
-- Is duplicate submission, overwrite, or idempotency behavior defined?
-- Are failure, retry, or offline/mobile behaviors specified?
-If material ambiguities exist, record: **`Requirement Completeness: GAP`** and list critical vs non-critical clarifications under *Developer Confirmations*. DO NOT invent arbitrary specifications. (Note: Incomplete details yield `GAP`, whereas total absence of a story yields `BLOCKED` at Step 0).
+## 5. Output Mode Selection
 
-#### B. Bidirectional Requirement ↔ Implementation Audit
-Evaluate both directions:
-1. **Requirement → Implementation:** Did the code implement all requested acceptance criteria? Flag missing criteria as `Coverage: Not Covered` with Quality Gate `GAP`.
-2. **Implementation → Requirement:** Did the code introduce unrequested behavior, extraneous endpoints, or scope creep? Flag as `Unrequested Scope` and evaluate for unintended regression risk.
+The output contract is governed strictly by the user's invocation mode, supporting CLI flags and natural-language requests:
 
-### 3. Identify Changed Behavior & Execution Trace
+| Mode | Triggers | Behavior |
+|---|---|---|
+| **Default** (`test-details`) | `/qa-impact-analysis`<br>Standard test requests | **Only Executable QA Test Details.** Outputs preconditions, test data, test cases with Priority, Type, Feasibility, Steps, Expected Result, and optional execution notes. **Zero narrative reasoning, zero internal IDs.** |
+| **Full** (`--full`) | `/qa-impact-analysis --full`<br>*"Give me the full impact analysis"*<br>*"Show me why these tests were selected"* | **Dual-Layer Technical Impact Analysis.** Exposes the full analytical engine: Scope, QA Release Handoff Card, Coverage Matrix, Checklist Decisions, Blast Radius, Side Effects, RBAC Matrix, Compatibility, Devil's Advocate, Scorecard, and Audited Test Cards. |
+| **Phased** (`--phased`) | `/qa-impact-analysis --phased`<br>*"Do phased analysis"*<br>*"Step by step impact review"* | **Interactive Checkpoint Workflow.** Phase 1 outputs understood Requirement + Scope + Confirmed Impact, then **STOPS** for developer feedback before generating final test details in Phase 2. |
 
-For behaviorally relevant changed symbols (filtering out cosmetic/formatting changes), trace:
-`Entry Point (Route/Event/Job) → Middleware/Auth → Service Logic → State Mutations/External Calls → Response/Side Effects → Consumers`
+---
 
-**Dynamic / Indirect Dependency Fallback:**
-Where dynamic reflection, string-based routing, or runtime DI containers prevent static resolution of callers, flag the caller as: `Potential Indirect Dependency` and require developer confirmation under *Unknowns* rather than assuming no callers exist.
+## 6. Default Test-Details Contract
 
-### 4. Conditionally Load Technology Checklists
+When invoked in Default Mode, the skill outputs **ONLY** the following contract:
 
-Load only the checklists directly relevant to the inspected diff:
-- `references/checklists/api.md` (REST/GraphQL/gRPC endpoints, payload contracts)
-- `references/checklists/database.md` (schemas, migrations, locking, transactions)
-- `references/checklists/events.md` (queues, publishers, consumers, idempotency)
-- `references/checklists/security.md` (authn/authz, input validation, encryption)
-- `references/checklists/aws.md` (serverless, cloud infrastructure failure paths)
-- `references/checklists/compatibility-and-caching.md` (rolling deploy, caching)
-- `references/checklists/web.md` (browser-specific behaviors, network drops, forms)
-- `references/checklists/mobile.md` (offline sync, device permissions, deep links)
-- `references/checklists/on-premise.md` (on-prem connectors, sync agents, tokens, drop reconnection)
-- `references/checklists/state-machines.md` (multi-step workflows, transitions)
-- `references/checklists/backend.md` (threading, concurrency, race conditions)
-- `references/checklists/regression.md` (blast radius, existing workflows)
+### What MUST Be Output:
+- `# QA Test Details`
+- `## Preconditions / Test Data`
+- `## Test Cases` (Numbered `TC-01`, `TC-02`...)
+  - `**Priority:**` P0 / P1 / P2 / P3
+  - `**Type:**` Functional / Negative / Regression / Security / Concurrency / Integration
+  - `**Feasibility:**` Manual / Requires test data / Requires developer support / Requires environment access
+  - `**Steps:**` Concrete, numbered sequential steps
+  - `**Expected Result:**` Bulleted observable client, API, DB, and operational telemetry outcomes
+- Optional brief `## Notes` (only when genuinely required for execution or scope clarity)
 
-### 5. Multi-Dimensional Blast Radius & Side-Effect Inventory
+### What MUST NOT Be Output:
+- ❌ Architecture narratives or call chains (`UserService.getUserData() → ...`)
+- ❌ Dependency graphs or blast-radius tables
+- ❌ Risk matrices or risk assessments
+- ❌ Internal finding IDs (`IMP-*`, `RISK-*`, `REQ-*`)
+- ❌ Confidence tags (`[Certain]`, `[Likely]`)
+- ❌ Checklist decisions table
+- ❌ Side-effect inventory tables
+- ❌ Quality gate scorecard or release gate discussions
+- ❌ Action items / ownership tables
 
-Analyze four blast-radius dimensions:
-1. **Direct Impact:** Modified lines, functions, classes, and database schemas.
-2. **Upstream Callers:** Call sites, controllers, and entry points invoking changed symbols.
-3. **Downstream Consumers:** Databases, caches, queues, third-party APIs, and external microservices.
-4. **Client Consumers:** Web apps, Mobile apps (Android/iOS), On-Premise sync connectors.
+### Canonical Default Output Template:
 
-**Side-Effect Inventory (Mandatory for State Mutations):**
-For any code modifying database records, sending emails/webhooks, or dispatching events, build an internal inventory:
-- Primary side effect (e.g., record inserted).
-- Secondary side effect (e.g., audit log created, notification queued).
-- Idempotency & Retry behavior (what happens if retried with identical idempotency key or request body?).
-- Partial failure behavior (what happens if step 2 fails after step 1 succeeds?).
-- Compensation / Recovery path (is there a rollback or saga mechanism?).
+```markdown
+# QA Test Details
 
-### 6. RBAC & Tenant Isolation Matrix
+## Preconditions / Test Data
 
-For changes affecting authorization or data access, generate an explicit verification matrix:
-| Persona / Role | Target Resource | Action | Expected Result | Evidence (file:line) |
+- User with [Role / Permission, e.g. Workplace Admin] access
+- Existing test records: [Specific entities / IDs / initial state]
+- Test data: [Exact JSON payloads, form values, boundary inputs, or file specs]
+- Operational tooling access: [CloudWatch Logs / Alarms / DB client] *(only if required to verify telemetry)*
+
+## Test Cases
+
+### TC-01 — [Primary Happy-Path Scenario Title]
+**Priority:** P0
+**Type:** Functional
+**Feasibility:** Manual / Requires test data / Requires developer support / Requires environment access
+
+**Steps**
+1. Log in as [User Role] and navigate to [View / Feature].
+2. Perform [Action / Input] with valid data [Data Specs].
+3. Click [Submit / Action Button].
+4. [Follow-up verification action, e.g. reload or inspect list].
+
+**Expected Result**
+- [Primary client observable outcome: success toast, updated view, status change].
+- [Backend/API outcome: HTTP 200/201, payload structure].
+- [Data persistence: record created in DB, expected field values].
+
+### TC-02 — [Negative / Boundary Condition Scenario Title]
+**Priority:** P0
+**Type:** Negative
+**Feasibility:** Manual / Requires test data / Requires developer support / Requires environment access
+
+**Steps**
+1. Navigate to [Feature].
+2. Provide invalid/boundary data [Data Specs, e.g. exceeding 500 records].
+3. Trigger the action.
+
+**Expected Result**
+- Request is rejected with expected validation error message [e.g. HTTP 400 Bad Request].
+- No partial state or orphan records written.
+- UI displays clear actionable field error.
+
+### TC-03 — [Implementation Impact / Regression Scenario Title]
+**Priority:** P0
+**Type:** Negative / Regression
+**Feasibility:** Manual / Requires test data / Requires developer support / Requires environment access
+
+**Steps**
+1. Request a non-existent or conflicting entity.
+2. Verify API response.
+3. Check application logs and CloudWatch metric/alarm.
+
+**Expected Result**
+- Expected NotFound response (e.g. HTTP 404) is returned.
+- Event is logged as WARN, not ERROR.
+- Expected NotFound does NOT increment the ERROR alarm or trigger pager.
+
+### TC-04 — [Failure Recovery / Unexpected Error Scenario Title]
+**Priority:** P1
+**Type:** Negative / Integration
+**Feasibility:** Requires developer support to inject controlled failure
+
+**Steps**
+1. Trigger controlled unexpected failure (with developer/infra support).
+2. Check Lambda/service logs.
+3. Check corresponding CloudWatch metric and alarm.
+
+**Expected Result**
+- Unexpected failure produces ERROR log.
+- CloudWatch metric count increases and triggers alarm according to threshold.
+- Notification (SNS/Slack) is dispatched.
+
+## Notes *(Optional)*
+
+- [Environment prerequisites, e.g. "Requires Prod-like staging environment with active CloudWatch Alarms."]
+- [Multi-tenant prerequisites, e.g. "Requires two separate workplace tenants to verify cross-tenant data isolation."]
+- [Scope note when omission might otherwise confuse QA, e.g. "**Scope Note:** No mobile-specific cases included; no affected mobile consumer was identified."]
+```
+
+---
+
+## 7. Full Mode Contract (`--full`)
+
+When invoked with `--full` or a request for full analysis, the skill outputs the complete Dual-Layer Technical Impact Analysis report:
+
+```markdown
+# QA Impact Analysis: [Feature / Bug Fix / Task Title]
+
+## Analysis Scope & Inspected Evidence
+
+- **User Story / Ticket Context:** `[Ticket-ID / Summary]` (Mandatory Input Gate: PASSED)
+- **Repository:** `[repository-name]`
+- **Git Scope:** `[base-branch]...[feature-branch]` (`[N]` commits)
+- **Working Tree:** Clean / Uncommitted changes included
+- **Inspected Evidence:** `[N]` source files, `[N]` infrastructure files, `[N]` test files, `[N]` schemas
+- **Not Inspected / Unavailable:** `[None / mobile-app / external-service / runtime configs]`
+- **Analysis Status:** `COMPLETE` / `PARTIAL` / `BLOCKED`
+- **Confidence Level:** `HIGH` / `MEDIUM` / `LOW` — *[Brief explanation]*
+
+---
+
+# LAYER 1: QA Release Handoff
+*(Copy-paste ready for Jira / Linear / GitHub PR Description)*
+
+### Summary & Risk Assessment
+- **Change Description:** [1-2 sentences summarizing what changed and why]
+- **Production Risk:** `CRITICAL` / `HIGH` / `MEDIUM` / `LOW`
+- **Blast Radius:** `CRITICAL` / `HIGH` / `MEDIUM` / `LOW`
+- **Contract Compatibility:** `Compatible` / `Breaking` / `Unverified (Cross-Repo)`
+- **Change Type:** `Bug Fix` / `New Feature` / `Refactor` / `API Change` / `DB Migration`
+- **Recommended QA Readiness:** `READY` / `READY WITH GAPS` / `BLOCKED`
+
+### Must-Test Scenarios (Mandatory QA)
+| TC-ID | Title | Priority | Risk | Feasibility | Reason |
+|---|---|---|---|---|---|
+| TC-001 | [Test Title] | P0 | HIGH | READY | Direct requirement validation |
+| TC-002 | [Test Title] | P0 | HIGH | REQUIRES TEST DATA | High-risk failure path / regression |
+
+### Blocking Production Risks & Devil's Advocate
+- **[Primary Risk]:** [Concrete failure mode that could cause production incident]
+- **[Secondary Risk]:** [State inconsistency, data corruption, or backward compatibility issue]
+
+### Action Items & Ownership
+| Action Item | Owner | Blocking Release? |
+|---|---|:---:|
+| [Action 1: e.g., Confirm mobile app schema compatibility] | Mobile Team | Yes |
+| [Action 2: e.g., Verify feature flag is configured in staging] | Developer / DevOps | Yes |
+| [Action 3: e.g., Execute mandatory manual QA test cases] | QA | Yes |
+
+---
+
+# LAYER 2: Detailed Technical Impact Analysis
+
+## 1. Bidirectional Requirements ↔ Test Coverage Matrix
+
+| Requirement / AC | Implementation Status | Implementation Evidence | Test Case | Coverage Status | Risk |
+|---|---|---|---|---|---|
+| REQ-01 | Met | `src/...:line` | TC-001 | Covered | High |
+| REQ-02 (Negative) | Met | `src/...:line` | TC-002 | Covered | High |
+| Unrequested Code | Unrequested Scope | `src/...:line` | — | Not Covered | Medium |
+
+## 2. Checklist Decisions
+
+| Checklist | Decision | Justification |
+|---|:---:|---|
+| `api.md` | LOADED / EXCLUDED | [Reason based on diff] |
+| `security.md` | LOADED / EXCLUDED | [Reason based on diff] |
+| `aws.md` | LOADED / EXCLUDED | [Reason based on diff] |
+| `database.md` | LOADED / EXCLUDED | [Reason based on diff] |
+| `mobile.md` | LOADED / EXCLUDED | [Reason based on diff] |
+
+## 3. Impact Summary & Blast Radius
+
+### Verified Impact [Certain]
+- Direct code changes, modified routes, updated database operations with exact `file:line` evidence.
+
+### Potential Impact [Likely]
+- Downstream callers, dependent UI components, event consumers inferred from architecture.
+
+### Cross-Repository & Unverified Risks [Unknown / Cannot Verify]
+- Companion client apps, external microservice consumers, unverified endpoints.
+
+## 4. Side-Effect Inventory & Partial-Failure Analysis
+*(Include when change creates, updates, or deletes state)*
+- **Primary State Effect:** [Main record/file/state created or updated]
+- **Secondary Side Effects:** [DB rows, S3 files, event bus messages, push notifications, cache keys]
+- **Partial-Failure Recovery Analysis:** [What if step 2 fails after step 1 succeeds? Are orphan records left? Is compensation logic in place?]
+
+## 5. Security & RBAC Authorization Matrix
+*(Include if auth, roles, workplace/tenant, or IDs are touched)*
+
+| Persona / Role | Resource & Scope | Action | Expected Result | Enforcement Evidence |
 |---|---|---|---|---|
-| Workplace Admin | Modified Endpoint | Read / Write | Allow (200 OK) | `src/auth/roles.ts:32` |
-| Member | Modified Endpoint | Read / Write | Deny / Allow per policy | `src/auth/roles.ts:45` |
-| Cross-Tenant User | Tenant B Resource | Any Action | Deny (404 / 403) | `src/middleware/tenant.ts:18` |
-| Unauthenticated | Any Resource | Any Action | Deny (401 Unauthorized) | `src/auth/jwt.ts:14` |
+| Workplace Admin | Workplace A Resource | Create / Update | Allow (`200 OK`) | `src/...:line` |
+| Member / Submitter | Workplace A Resource | Update | Deny (`403 Forbidden`) | `src/...:line` |
+| Member (Workplace B) | Workplace A Resource | Read | Deny (`404 / 403 Cross-Tenant`) | `src/...:line` |
+| Unauthenticated | Any Resource | Any API Call | Deny (`401 Unauthorized`) | `src/...:line` |
 
-### 7. Compatibility, Caching & Feature Flags
+## 6. Compatibility, Caching & Rollout Analysis
+*(Include if API, DB, cache, or feature flags are touched)*
+- **Client Caching:** [LocalStorage, IndexedDB, SQLite, CoreData impact]
+- **Rolling Deployment ($N$ / $N+1$):** [Behavior when old client hits new backend or vice versa]
+- **Feature Flag Strategy:** [Behavior when Flag is OFF vs ON, and dynamic toggle safety]
 
-- **Client Caching:** Check LocalStorage, IndexedDB, SQLite/Room, CoreData, MMKV, offline sync queues.
-- **Rolling Deployment ($N$ / $N+1$):** Old client hitting new backend; new client hitting old backend; database columns nullable or defaulted.
-- **Feature Flags:** Test `Flag = OFF` (baseline regression), `Flag = ON` (new behavior), `OFF → ON` transition, `ON → OFF` rollback, and dynamic mid-session toggle.
+## 7. Devil's Advocate Failure Analysis
 
-### 8. Devil's Advocate Failure Analysis
+| Hypothesis | Vulnerability / Failure Mode | Evidence / Mechanism | Mitigating Test Case |
+|---|---|---|---|
+| [Assumption failure] | [What happens if input format or order varies] | `src/...:line` | TC-003 |
+| [Race condition] | [Rapid double-submit or simultaneous calls] | `src/...:line` | TC-004 |
 
-Formulate hypothesis-driven failure scenarios:
-1. **Newly introduced assumption:** What assumption about input shape, ordering, or network timing is most prone to failure?
-2. **Silent divergence:** Could callers receive unexpected data without an error being raised?
-3. **Race condition & double-submit:** What happens if two identical requests arrive concurrently?
+## 8. QA Test Details (Executable Manual Test Cards)
 
-### 9. Inspect Existing Tests & Test Quality
+### TC-001 — [Area]: [Title]
+- **Objective:** [Specific business rule or failure mode verified]
+- **Type:** Functional / Negative / Boundary / Regression / Security / Concurrency
+- **Risk:** HIGH | **Priority:** P0 | **Execution Tier:** Mandatory QA
+- **Execution Feasibility:** READY / REQUIRES TEST DATA / REQUIRES DEV/INFRA SUPPORT
+- **Target Platform:** Web Desktop / Mobile (Android/iOS) / API / On-Premise
+- **Environment:** Specified in context / Requires Confirmation
+- **Persona / Role:** [e.g., Workplace Admin]
+- **Preconditions:**
+  1. [Initial state requirement 1]
+- **Test Data:**
+  - `field_name`: `"test_value"`
+- **Steps:**
+  1. [Step 1]
+  2. [Step 2]
+- **Expected Observable Results:**
+  - **Mandatory Oracle (Required for Pass/Fail):**
+    - **UI:** [Banner text, modal, field error, button state]
+    - **API:** [HTTP status code, response body payload]
+    - **Database:** [Record mutation, audit log created]
+  - **Diagnostic Observation (Operational Signal — Not Pass/Fail Blocker):**
+    - **Observability:** [Log string, metric increment; flag for verification if unconfirmed]
+- **Cleanup / Postconditions:** [Reset state / restore flag]
+- **Traceability:** REQ-01 → IMP-01 → RISK-01
+- **Evidence:** `src/handlers/example.ts:45` (Source: repository / requirement / user-confirmed)
 
-Statically evaluate existing tests:
-- `Covered`: Directly tests the changed behavior with deep assertions.
-- `Partially Covered (Shallow)`: Exercises the code path but lacks payload/side-effect assertions.
-- `Not Covered`: No tests exercise the changed behavior.
-- `Stale / Contradictory`: Expects old behavior that this change deliberately modifies.
+*(Repeat for each TC-ID. Omit irrelevant sub-bullets.)*
 
-**Execution Honesty Rule:**
-Automated test suites are strictly inspection-only. Never execute test runners (`npm test`, `vitest`, `jest`, `playwright`, `pytest`), compilers (`tsc`), or build scripts. Statically reading test files does NOT constitute running them. Always report: `Automated Tests: NOT RUN (inspected statically)`. Never claim tests "passed" based on static inspection alone.
+## 9. Existing Coverage & Test Quality Evaluation
 
-### 10. Generate Executable Manual QA Test Cases (Two-Pass Generation Flow)
+- **Automated Tests Execution:** `NOT RUN (inspected statically)` *(or list execution results)*
 
-Execute test generation in distinct, cleanly separated passes:
-- **Pass 1 (Story Tests — Direct AC Validation):**
-  - Explicitly labeled: `Category: Direct Requirement (Story AC)`.
-  - Directly tests the primary user workflows and acceptance criteria stated in the user story.
-  - Keeps tests focused on the core requirement without bloating with unrequested scenarios.
-  - Strictly honors Out-of-Scope boundaries (no tests generated for out-of-scope items).
-- **Pass 2 (Implementation Impact Tests — Secondary Blast Radius):**
-  - Explicitly labeled: `Category: Implementation Impact / Regression`.
-  - Covers secondary edge cases discovered by tracing code blast radius, side effects, legacy workflows (e.g., editing vs viewing existing entities with deprecated fields), database constraints, and stale automated tests.
-  - Clearly separated from direct acceptance criteria so QA knows what is core requirement vs. what is defensive regression testing.
-- **Pass 3 (Merge & Deduplicate):** Combine into prioritized suite with clear category labels.
+| Test File / Suite | Tested Symbol / Route | Status | Assertion Depth & Notes |
+|---|---|---|---|
+| `test/example.test.ts` | `updateRecord()` | Partially Covered | Shallow: only checks 200, does not assert payload. |
 
-Every generated test suite must be grounded in the deep internal analysis pipeline. Test cases are formatted according to the active mode:
+## 10. Quality Gate Scorecard & Release Gate
 
-#### A. Default Mode (`test-details`) — Clean Executable Manual QA Test Schema
-The default output is tailored strictly for QA engineers to execute without wading through engineering architecture reports.
-- **Top-level Preconditions & Test Data:** Consolidated environment, persona, and test data requirements.
-- **Concise Test Cards:**
-  - `### TC-01 — <Test Scenario Title>`
-  - `**Priority:** P0 / P1 / P2 / P3`
-  - `**Type:** Functional / Negative / Regression / Security / Concurrency / Integration`
-  - `**Feasibility:** Manual / Requires test data / Requires developer support / Requires environment access`
-  - `**Steps:**` Sequential, concrete numbered actions (no generic placeholders like "verify lambda works").
-  - `**Expected Result:**` Clear bullet points detailing observable UI, API, DB, and telemetry behavior.
-- **Self-Contained Execution Contract:** A QA engineer who has only the generated Test Details and stated prerequisites must be able to execute the test without reading code or the Skill's internal analysis.
-- **Intelligent Platform Exclusions:** Only generate tests for affected platforms (Web, Android, iOS, On-Premise). Omit unimpacted platforms. Include an optional brief note only if omission might confuse QA (e.g. `**Scope Note:** No mobile-specific cases included; no affected mobile consumer was identified.`).
-- **Zero Internal Noise:** No internal IDs (`IMP-*`, `RISK-*`, `REQ-*`), no confidence tags (`[Certain]`, `[Likely]`), no pseudo-code or diff dumps.
+### 9-Dimension Quality Gate Scorecard
+| Dimension | Status | Notes |
+|---|:---:|---|
+| Requirement Completeness | PASS / GAP | Story ambiguity / completeness audit |
+| Requirement Coverage | PASS / GAP | All acceptance criteria mapped |
+| Code/Behavior Coverage | PASS / GAP | All modified code branches tested |
+| Dependency Coverage | PASS / GAP | Downstream callers evaluated |
+| Contract Coverage | PASS / GAP | API/event contracts verified |
+| Security & Tenant Isolation | PASS / GAP | RBAC matrix verified |
+| Cross-Repository Coverage | PASS / GAP / UNKNOWN | Companion repos or contract fallback |
+| Evidence Integrity | PASS / GAP | All assertions grounded in evidence |
+| Automated Test Status | NOT RUN | Inspected statically |
 
-#### B. Full Mode (`--full`) — Comprehensive Audited Test Schema
-In `--full` mode, test cards include complete analytical metadata:
-- **TC-ID / Title**
-- **Category:** `Direct Requirement (Story AC)` | `Implementation Impact / Regression`
-- **Objective:** Specific failure mode or contract rule verified
-- **Type, Risk, Priority, Execution Tier, Feasibility, Target Platform, Persona / Role**
-- **Preconditions, Test Data, Execution Steps**
-- **Mandatory Oracle (Pass/Fail) vs. Diagnostic Observation (Telemetry)**
-- **Cleanup / Postconditions**
-- **Traceability & Evidence:** `REQ-ID → IMP-ID → RISK-ID` | `file:line` (Evidence source: `repository` / `requirement` / `user-confirmed`)
+- **Quality Gate Overall:** `PASS` / `GAP` / `BLOCKED`
+- **Recommended QA Readiness:** `READY` / `READY WITH GAPS` / `BLOCKED`
+- **Gate Justification:** [Summary of decision]
+```
 
-### 11. Mechanical Quality Gate & QA Readiness
+---
 
-Evaluate two separate gates internally (reported explicitly only in `--full` mode):
+## 8. Phased Mode Contract (`--phased`)
 
-1. **Quality Gate Scorecard (`PASS` / `GAP` / `BLOCKED`):**
+When invoked with `--phased` or a request for phased analysis, the workflow splits into two distinct phases with a mandatory human checkpoint:
+
+### Phase 1 Checkpoint (Outputs Requirement + Scope + Confirmed Impact):
+
+```markdown
+# QA Impact Analysis: Phase 1 Checkpoint
+
+## 1. Requirement Understanding
+- **User Story:** [Summary of business requirement]
+- **Primary Acceptance Criteria:**
+  1. [Criterion 1]
+  2. [Criterion 2]
+- **Out of Scope Items:** [Explicitly excluded scope]
+
+## 2. Detected Change Scope
+- **Repository & Branch:** `[repo-name]` (`[base]...[current]`)
+- **Modified Components:**
+  - `[Service / Controller / Lambda]`: [Summary of change]
+  - `[Database / Schema / Migrations]`: [Summary of mutation]
+  - `[Infrastructure / CloudFormation / Alarms]`: [Summary of infra changes]
+
+## 3. Confirmed Impact & Dependencies
+- **Upstream Call Sites:** [Direct controllers or entry points]
+- **Downstream Services / DBs:** [Impacted databases, queues, external APIs]
+- **Client Impact:**
+  - Web: [Impacted views / forms]
+  - Mobile: [Android/iOS impact or confirmed unimpacted]
+- **Primary Risk Hypotheses:**
+  1. [Hypothesis 1, e.g. Race condition on double submit]
+  2. [Hypothesis 2, e.g. CloudWatch alarm false positives on 404]
+
+---
+
+### 🛑 Checkpoint: Developer Confirmation Required
+
+Please review the understood requirement, change scope, and impact graph:
+- **Did we miss any affected service, database, or background worker?** (e.g. *"You missed ReportingService"*)
+- **Are there corrections to expected behavior or business rules?** (e.g. *"Expected behavior is 404, not 400"*)
+
+Reply with your feedback or say **"Proceed"** to generate the final executable QA test details.
+```
+
+**STOP & WAIT:** The agent halts execution at this checkpoint and waits for developer feedback.
+
+### Phase 2 Final Test Details (Outputs clean QA Test Details incorporating feedback):
+Upon receiving developer feedback, the skill marks overrides as `[User-Confirmed]`, recomputes coverage and risk, and outputs the clean QA Test Details following the Default Mode template.
+
+---
+
+## 9. Reference Loading Rules
+
+The skill loads detailed guidance from the repository's `references/` directory when available:
+- **Output Templates:** `references/templates/qa-test-details.md`
+- **Test Generation Guide:** `references/test-generation-guide.md`
+- **Technology Checklists:**
+  - `references/checklists/api.md`
+  - `references/checklists/aws.md`
+  - `references/checklists/backend.md`
+  - `references/checklists/database.md`
+  - `references/checklists/events.md`
+  - `references/checklists/mobile.md`
+  - `references/checklists/on-premise.md`
+  - `references/checklists/regression.md`
+  - `references/checklists/security.md`
+  - `references/checklists/state-machines.md`
+  - `references/checklists/web.md`
+  - `references/checklists/compatibility-and-caching.md`
+
+**Autonomous Fallback Rule:**
+If the `references/` directory is unavailable in the host environment (e.g. when `SKILL.md` is distributed or evaluated as a single standalone file), `SKILL.md` contains all required rules, schemas, and templates inline to operate completely autonomously without degradation.
+
+---
+
+## 10. Quality Gate & Release Readiness
+
+The skill maintains a strict separation between analytical completeness and release safety:
+
+1. **Analytical Quality Gate Scorecard (`PASS` / `GAP` / `BLOCKED`):**
    - `PASS`: All required evidence, acceptance criteria, and critical risk paths are fully mapped to test cases.
    - `GAP`: A meaningful coverage, requirement completeness, or evidence limitation remains, but analysis is complete.
-   - `BLOCKED`: A prerequisite prevented meaningful analysis (e.g., repository unreadable, no code diff available).
+   - `BLOCKED`: A prerequisite prevented meaningful analysis (e.g., repository unreadable, no code diff available, missing user story).
 2. **Recommended QA Readiness (`READY` / `READY WITH GAPS` / `BLOCKED`):**
    - `READY`: Change is safe and verified for QA handoff.
    - `READY WITH GAPS`: Change can be tested by QA, but specific external risks, staging verifications, or known implementation bugs require attention.
    - `BLOCKED`: Known unresolved blocker or broken contract prevents QA testing.
-
----
-
-## Output Formats & Templates
-
-The output format is governed strictly by the active invocation mode. All templates are defined in [`references/templates/qa-test-details.md`](references/templates/qa-test-details.md).
-
-### 1. Default Mode (`test-details` — `/qa-impact-analysis`)
-- **Use Template 1:** [`references/templates/qa-test-details.md#1-default-test-details-template`](references/templates/qa-test-details.md)
-- **Content:** Strict `# QA Test Details` deliverable containing:
-  - `## Preconditions / Test Data`
-  - `## Test Cases` (TC-01, TC-02...) with Priority, Type, Feasibility, numbered Steps, and bulleted Expected Results.
-  - Optional brief `## Notes` (only when genuinely required for execution or scope clarity).
-- **Enforcement:** Zero reasoning narrative, zero architecture analysis, zero dependency graphs, zero risk matrices, zero evidence ledgers, zero checklist decisions, zero internal finding IDs (`IMP-*`, `RISK-*`, `REQ-*`), zero confidence tags.
-
-### 2. Full Mode (`--full` — `/qa-impact-analysis --full`)
-- **Use Template 2:** [`references/templates/qa-test-details.md#2-full-analysis-template`](references/templates/qa-test-details.md)
-- **Content:** Complete Dual-Layer Technical Impact Analysis report:
-  - Scope & Inspected Evidence
-  - Layer 1: QA Release Handoff (Summary & Risk Assessment, Must-Test Table, Blocking Risks, Action Items)
-  - Layer 2: Detailed Technical Impact Analysis (Coverage Matrix, Checklist Decisions, Blast Radius, Side Effects, RBAC Matrix, Compatibility, Devil's Advocate, Existing Test Evaluation, Full Audited QA Test Cards, Quality Gate Scorecard).
-
-### 3. Phased Mode (`--phased` — `/qa-impact-analysis --phased`)
-- **Phase 1 (Checkpoint):** Use Template 3: [`references/templates/qa-test-details.md#3-phased-phase-1-template-checkpoint`](references/templates/qa-test-details.md)
-  - Outputs: **Requirement Understanding + Detected Change Scope + Confirmed Impact Graph**.
-  - **STOP & WAIT:** Halts execution and asks developer to confirm or correct scope (e.g., *"You missed ReportingService"*) and expectations (e.g., *"Expected behavior is 404, not 400"*).
-- **Phase 2 (Final Test Details):** Use Template 4: [`references/templates/qa-test-details.md#4-phased-final-test-details-template`](references/templates/qa-test-details.md)
-  - Outputs: Clean, executable QA Test Details incorporating developer feedback.
-
-
