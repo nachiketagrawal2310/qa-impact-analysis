@@ -25,7 +25,7 @@ Most AI test generators fail because they rely on only **one** source of truth:
 1. **Ticket-only AI:** Reads the Jira issue, hallucinates tests based on generic concepts, and has no idea what the code actually does.
 2. **Diff-only AI:** Reads the Git diff, assumes whatever buggy code the developer wrote was intended, and reverse-engineers tests from bugs.
 
-`qa-impact-analysis` combines **two sources of truth**:
+`qa-impact-analysis` combines **two sources of truth** with an internal analysis pipeline:
 
 ```text
 User Story / Acceptance Criteria  →  Defines what the system SHOULD do
@@ -34,13 +34,28 @@ Actual Git Diff / Repository     →  Defines what the code ACTUALLY does
              ↓
      QA Impact Analysis
              ↓
-Requirement ↔ Implementation Trace
-             ↓
-Multi-Dimensional Blast Radius & Side Effects
-             ↓
-Deterministic Manual QA Test Suite
-             ↓
-     QA Release Handoff
+┌─────────────────────────────────────────────────────────┐
+│              INTERNAL DEEP ANALYSIS (SILENT)            │
+│  • Code Diff & Dependency Tracing                       │
+│  • AWS / Cloud / Database / State Machine Analysis      │
+│  • Web / Android / iOS / On-Premise Impact Discovery    │
+│  • Security & Multi-Tenant Boundary Verification        │
+│  • Regression Tracing & Devil's Advocate Hypotheses     │
+│  • Static Test Coverage & Quality Gate Scoring          │
+└────────────────────────────┬────────────────────────────┘
+                             │
+                             ▼
+ ┌────────────────────────────────────────────────────────┐
+ │           DEFAULT OUTPUT: QA TEST DETAILS              │
+ │  • Consolidated Preconditions & Test Data              │
+ │  • Step-by-Step Executable Manual Test Cases           │
+ │  • Concrete Expected Results & Feasibility Tags        │
+ │  • Zero Reasoning Narrative / Zero Metadata Clutter    │
+ └────────────────────────────────────────────────────────┘
+
+Optional:
+  • --full   / "Give me full impact analysis" → Exposes complete technical analysis
+  • --phased / "Do phased analysis"          → Checkpoint on Scope + Impact before tests
 ```
 
 ---
@@ -88,115 +103,97 @@ Acceptance Criteria:
 
 ## Example Output
 
-Here is what `/qa-impact-analysis` generates in your chat session:
-
-### Layer 1: QA Release Handoff Card
-*(Compact summary ready to paste directly into Jira, Linear, or GitHub PR descriptions)*
+### Default Output: QA Test Details
+*(Directly executable manual test cases generated for the story above)*
 
 ```markdown
-### QA Release Handoff: Invoice Batch Export (INV-104)
+# QA Test Details
 
-- **Production Risk:** HIGH | **Blast Radius:** MEDIUM | **Contract:** Compatible
-- **Change Type:** New Feature | **Recommended QA Readiness:** READY
+## Preconditions / Test Data
 
-#### Must-Test Scenarios (Mandatory QA)
-| TC-ID | Title | Priority | Risk | Feasibility | Reason |
-|---|---|---|---|---|---|
-| TC-001 | Successful CSV Export under 500 records | P0 | HIGH | READY | Direct AC-1 & AC-2 validation |
-| TC-002 | Reject export exceeding 500 record ceiling | P0 | HIGH | READY | Boundary condition limit |
-| TC-003 | Rapid double-click duplicate submission | P0 | HIGH | READY | Devil's advocate race condition |
-| TC-004 | Member role attempt to trigger export | P1 | HIGH | READY | RBAC isolation boundary |
+- User with Workplace Admin role in Workspace A
+- User with Member role in Workspace A (for RBAC test)
+- Existing invoices in billing cycle (minimum 10 records)
+- Boundary dataset: Invoice batch exceeding 500 records
+- Chrome/Firefox browser with Network DevTools access
 
-#### Blocking Production Risks & Devil's Advocate
-- **Race Condition on Double-Submit:** Rapidly clicking "Export" triggers two concurrent Lambda executions. Mitigated by Redis idempotency lock (`src/services/lock.ts:42`).
-- **Memory Ceiling:** PDF generation buffers in memory; jobs with >300 heavy invoices risk Lambda out-of-memory.
+## Test Cases
 
-#### Action Items & Ownership
-| Action Item | Owner | Blocking Release? |
-|---|---|:---:|
-| Verify Redis idempotency lock TTL in staging config | DevOps / Backend | Yes |
-| Execute mandatory manual test suite (TC-001 to TC-004) | QA | Yes |
-```
+### TC-01 — Successful CSV Export under 500 records
+**Priority:** P0
+**Type:** Functional
+**Feasibility:** Manual
 
-### Layer 2: Executable Manual QA Test Card (Sample)
-*(Adheres to the Canonical Executable Test Schema)*
+**Steps**
+1. Log in as Workplace Admin and navigate to Billing > Invoices.
+2. Click "Export Monthly Invoices".
+3. Select "CSV" format from dropdown and click "Download".
+4. Open the downloaded CSV file.
 
-```markdown
-#### TC-003: Rapid double-click duplicate submission handling
-- **Objective:** Verify concurrent export requests with identical parameters reject duplicate processing and return conflict response without generating duplicate S3 objects.
-- **Type:** Concurrency / Negative | **Risk:** HIGH | **Priority:** P0 | **Tier:** Mandatory QA
-- **Execution Feasibility:** READY (Executable immediately with standard credentials)
-- **Target Platform:** Web Desktop / REST API | **Persona / Role:** Workplace Admin
-- **Preconditions:** Workplace has at least 10 invoices in current billing cycle.
-- **Execution Steps:**
-  1. Navigate to Billing > Invoices.
-  2. Open Browser DevTools Network tab with throttling set to "Fast 3G".
-  3. Click "Export Monthly Invoices", select "CSV".
-  4. Rapidly double-click the "Download" button within 200ms.
-- **Expected Observable Results:**
-  - **Mandatory Oracle (Pass/Fail):**
-    - First request returns HTTP 200 / 202 with job initiation payload.
-    - Second request returns HTTP 409 Conflict with UI message "Export already in progress".
-    - S3 bucket `clappia-invoices-export/` contains exactly ONE generated CSV archive for the billing cycle.
-  - **Diagnostic Observation:**
-    - Redis key `lock:export:{workspaceId}:{month}` observed with 60-second TTL.
-- **Cleanup:** Delete generated test export artifact from user downloads.
-- **Traceability:** REQ: AC-5 | IMP: `src/services/lock.ts:42` | RISK: Double-charge / duplicate file generation
-```
+**Expected Result**
+- Download initiates immediately with HTTP 200.
+- Downloaded CSV contains invoice records matching billing screen.
+- S3 archive is created under workspace billing prefix.
 
----
+### TC-02 — Reject export exceeding 500 record ceiling
+**Priority:** P0
+**Type:** Negative
+**Feasibility:** Requires test data
 
-## What It Analyzes
+**Steps**
+1. Navigate to Billing > Invoices on a workspace with >500 records.
+2. Select all invoices and click "Export Monthly Invoices".
+3. Select format and submit.
 
-The skill inspects your actual codebase and selectively applies specialized failure semantics:
+**Expected Result**
+- Request is rejected with HTTP 400 Bad Request.
+- UI displays clear validation error: "Batch export cannot exceed 500 records."
+- No background export job or S3 object is created.
 
-- **Backend & APIs:** REST endpoints, GraphQL mutations, RPC handlers, middleware auth, payload validation, status codes.
-- **Databases:** PostgreSQL, MySQL, MongoDB, DynamoDB conditional checks, optimistic concurrency, transactions, lock contention, migrations.
-- **AWS & Serverless:** Lambda timeouts (trigger-dependent ceilings), SQS queue visibility vs. function execution, S3 pre-signed URLs, EventBridge event routing, Step Functions state rollbacks.
-- **Web Clients:** React/Next.js routes, optimistic UI states, token expiration, network drop banners, form double-submission.
-- **Mobile Apps (Android & iOS):** Offline sync queues, backward-compatible API contracts, version coexistence (Client v1 against Backend v2).
-- **On-Premise & Hybrid:** Sync agents, connectivity drops midway through sync, mTLS/token expiry, out-of-order replay idempotency, reconciliation jobs.
+### TC-03 — Rapid double-click duplicate submission handling
+**Priority:** P0
+**Type:** Concurrency / Negative
+**Feasibility:** Manual
 
----
+**Steps**
+1. Navigate to Billing > Invoices.
+2. Set Network throttling to "Fast 3G" in Browser DevTools.
+3. Click "Export Monthly Invoices" and rapidly double-click "Download" within 200ms.
 
-## What You Get
+**Expected Result**
+- First request returns HTTP 200/202 and initiates export.
+- Second request returns HTTP 409 Conflict with banner: "Export already in progress".
+- Exactly ONE export job runs; no duplicate files created.
 
-Every analysis delivers a structured **Two-Layer Handoff**:
+### TC-04 — Member role attempt to trigger export
+**Priority:** P1
+**Type:** Security / RBAC
+**Feasibility:** Manual
 
-1. **Layer 1: QA Release Handoff Card**
-   Compact, copy-paste-ready summary for PR descriptions, Jira, or Slack handoffs containing risk ratings, blocking risks, action owners, and must-test scenarios referenced by ID.
-2. **Layer 2: Detailed Technical Impact Analysis**
-   - Bidirectional Requirements Matrix (`REQ → Code` and `Code → REQ` scope creep audit)
-   - Multi-Dimensional Blast Radius (Upstream callers, downstream consumers, DB tables)
-   - Devil's Advocate Failure Analysis & Side-Effect Inventory
-   - Role-Based Access Control (RBAC) Isolation Matrix
-   - Complete Executable Manual QA Test Cards
-   - Existing Test Evaluation (`Covered`, `Shallow`, or `Stale/Contradictory`)
-   - **9-Dimension Quality Gate Scorecard** (`PASS` / `GAP` / `BLOCKED`)
+**Steps**
+1. Log in as standard Member.
+2. Attempt to navigate directly to Billing export endpoint `/api/workspaces/{id}/invoices/export`.
 
----
+**Expected Result**
+- Request is denied with HTTP 403 Forbidden.
+- UI does not render export button for non-admin personas.
 
-## How It Works
+## Notes
 
-```text
-Step 0: Mandatory Input Gate  → Verify User Story + AC present (Missing → BLOCKED)
-Step 1: Context Discovery     → Read Git diff, branch, stack manifests (Read-Only)
-Step 2: Requirement Audit     → Story Completeness & Bidirectional Code Mapping
-Step 3: Execution Tracing     → Trace entry points, services, mutations, callers
-Step 4: Failure Analysis      → Devil's Advocate scenarios & Side-Effect Inventory
-Step 5: 3-Pass Test Suite     → Pass 1 (Story) + Pass 2 (Impact) → Pass 3 (Merged)
-Step 6: Quality Gate Scorecard→ Evaluate 9 analytical dimensions & QA readiness
+- **Scope Note:** No mobile-specific cases included; no affected mobile consumer was identified.
 ```
 
 ---
 
-## Analysis Modes
+## Output Modes & Flags
 
-| Mode | Command | Behavior |
+You can control the output format using CLI-style flags or natural-language requests:
+
+| Mode | Triggers | Deliverable |
 |---|---|---|
-| **Auto** (Default) | `/qa-impact-analysis` | Runs to completion automatically. Pauses for developer confirmation only if it detects unresolved breaking contracts or security boundary ambiguities. |
-| **Fast** | `/qa-impact-analysis --mode fast` | One-shot analysis without interactive pauses. Ideal for standard bug fixes or pre-commit checks. |
-| **Phased** | `/qa-impact-analysis --mode phased` | Pauses after Phase 1 (Impact Graph & Requirements). Allows you to provide `user-confirmed` overrides before generating test cases. |
+| **Default** | `/qa-impact-analysis` | **Only Executable QA Test Details** (Preconditions, Test Cases with Priority, Type, Feasibility, Steps, Expected Result). Strictly zero narrative reasoning or internal IDs. |
+| **Full Analysis** | `--full` or *"Give me the full impact analysis"*, *"Show me why these tests were selected"* | **Dual-Layer Technical Impact Report** (Scope, QA Release Handoff Card, Coverage Matrix, Checklist Decisions, Blast Radius, Side Effects, RBAC Matrix, Compatibility, Devil's Advocate, Scorecard). |
+| **Phased** | `--phased` or *"Do phased analysis"*, *"Step by step impact review"* | **Interactive Checkpoint**: Phase 1 outputs understood Requirement + Scope + Confirmed Impact, then **STOPS** for developer feedback before generating final tests in Phase 2. |
 
 ---
 
@@ -220,7 +217,7 @@ The skill is governed by **14 codified evaluation benchmarks** in [`evaluation/c
 | **EVAL-04** | Execution Honesty | Reports `Automated Tests: NOT RUN (inspected statically)` when not run. |
 | **EVAL-05** | Gate Separation | Separates analytical quality gate (`GAP`) from release blockers (`BLOCKED`). |
 | **EVAL-06** | Test Executability | Mandates feasibility tags, concrete steps, and observable oracles. |
-| **EVAL-07** | Dual-Layer Output | Layer 1 references Layer 2 test IDs without duplicating test bodies. |
+| **EVAL-07** | Default Output Contract | Default output is strictly executable QA test details with zero narrative; dual-layer report reserved for --full. |
 | **EVAL-08** | RBAC Isolation | Tests Admin, Member, Cross-Tenant, and Anonymous personas. |
 | **EVAL-09** | Precision Filter | Excludes irrelevant technology checklists (e.g. AWS checklist on CSS changes). |
 | **EVAL-10** | Feasibility Tags | Flags tests requiring infrastructure or database seed setups. |

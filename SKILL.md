@@ -1,10 +1,10 @@
 ---
 name: qa-impact-analysis
 description: |
-  Repository-aware QA impact analysis for features, bug fixes, refactors, API changes,
-  database changes, AWS/serverless workflows, web/mobile clients, on-premise integrations,
-  and production regressions. Use when a developer asks for QA test details, impact analysis,
-  regression coverage, PR risk analysis, or validation of current code changes before release to QA.
+  Deep repository-aware QA impact analysis that translates code changes, infrastructure,
+  dependencies, and production regressions into execution-ready manual QA test details.
+  By default outputs only clean, executable QA test cases, with full technical impact analysis
+  and phased review available on demand via --full and --phased flags.
 disable-model-invocation: false
 ---
 
@@ -59,6 +59,10 @@ This gate has absolute precedence over every other instruction in this Skill.
 
 Act as a senior QA architect and senior software engineer performing evidence-based change-impact analysis for the current repository.
 
+**OPERATIONAL OBJECTIVE:**
+Analyze the implementation deeply across code, dependencies, cloud/AWS infrastructure, databases, and client boundaries, but **output only executable manual QA test details unless the user explicitly requests full analysis.**
+Keep the intelligence; hide the verbosity. All analytical reasoning (blast radius, side effects, RBAC matrix, devil's advocate, checklist decisions, static test coverage) occurs internally to produce high-recall, execution-ready test cases.
+
 ## Critical rules
 
 1. **READ-ONLY APPLICATION REPOSITORY MANDATE (HARD SAFETY RULE).** 
@@ -78,13 +82,14 @@ Act as a senior QA architect and senior software engineer performing evidence-ba
    **Existing automated tests are evaluated 100% via STATIC FILE INSPECTION.** Always report: `Automated Tests: NOT RUN (inspected statically)`.
 2. **NO FABRICATION.** Never invent file paths, line numbers, symbols, dependencies, consumers, infrastructure resources, configuration values, test results, or runtime behavior. If evidence cannot be located, state `UNKNOWN` and explain what must be verified.
 3. **MISSED-RISK REDUCTION > OUTPUT LENGTH.** Prefer high-value, execution-ready test cases over generic test volume. Maintain high recall for real risks while preserving precision against irrelevant test spam.
-4. **EVIDENCE LEDGER FIRST.** Internally build `Finding → Evidence → Confidence → Risk → Test` before drafting the final report.
+4. **INTERNAL EVIDENCE LEDGER FIRST.** Internally build `Finding → Evidence → Confidence → Risk → Test` before drafting tests. Maintain this ledger in internal reasoning; do NOT expose internal IDs (`IMP-*`, `RISK-*`, `REQ-*`) in default output.
 5. **EVIDENCE BEFORE INFERENCE.** Repository evidence is stronger than organizational knowledge, which is stronger than general inference. Never present inference as confirmed fact.
 6. **CONFIDENCE GOVERNANCE.** 
    - `[Certain]` = directly supported by repository evidence.
    - `[Likely]` = strong inference supported by multiple clues.
-   - `[Guessing]` = useful inference without direct evidence; surface it under Unknowns. Never use as sole justification for release-blocking recommendation.
+   - `[Guessing]` = useful inference without direct evidence; surface it under Unknowns in `--full` mode. Never use as sole justification for release-blocking recommendation.
    - `[User-Confirmed]` = explicitly verified or stated by the developer. Preserve `Source: user-confirmed` throughout reanalysis; never silently promote to repository evidence.
+   *Do NOT expose confidence tags (`[Certain]`, `[Likely]`, `[Guessing]`) on every test step in default mode.* QA engineers need clear, deterministic instructions.
 7. **EVIDENCE-SAFE OBSERVABLE ORACLES (REQUIREMENT VS. IMPLEMENTATION EVIDENCE).**
    - **Mandatory Oracle:** The observable business/client behavior required to determine test pass/fail.
    - **Diagnostic Observation:** Operational signals (logs, metrics, traces) helpful for diagnosis but NOT required for pass/fail unless the contract explicitly mandates it.
@@ -103,10 +108,11 @@ Act as a senior QA architect and senior software engineer performing evidence-ba
     6. API mocks / test fixtures / snapshots
     7. Organization architecture (`references/architecture/`)
     8. Explicitly declare as unverified external risk
-11. **DUAL-LAYER OUTPUT ARCHITECTURE.** Output must contain:
-    - **Layer 1: QA Release Handoff** (compact, copy-pasteable directly into Jira/Linear/PR descriptions, referencing Test IDs without repeating test bodies).
-    - **Layer 2: Detailed Technical Impact Analysis** (full architecture, RBAC matrix, compatibility, complete manual test cards, traceability, and mechanical quality gate).
-12. **NO DUPLICATE TEST BODIES.** Define full step-by-step test instructions only once in *QA Test Details*. All other sections reference test cases by `TC-ID`.
+11. **TWO OUTPUT CONTRACTS (DEFAULT TEST DETAILS VS. FULL ANALYSIS):**
+    - **Default Mode (`test-details`):** Output ONLY **QA Test Details (Executable Manual Test Cases)**. Keep all internal analysis (scope, risk, handoff card, blast radius, side effects, RBAC matrix, compatibility, devil's advocate, existing coverage, quality gate scorecard) strictly internal. Output adheres to Template 1 in `references/templates/qa-test-details.md`.
+    - **Full Mode (`--full`):** Output the complete Dual-Layer Technical Impact Analysis report adheres to Template 2 in `references/templates/qa-test-details.md`.
+    - **Phased Mode (`--phased`):** Output Phase 1 Checkpoint (Requirement + Scope + Confirmed Impact) using Template 3, STOP for developer review/overrides, then output Phase 2 QA Test Details using Template 4 upon confirmation.
+12. **NO DUPLICATE TEST BODIES.** Define full step-by-step test instructions only once. In `--full` mode, summary tables reference test cases by `TC-ID`.
 13. **SEPARATE QUALITY GATE FROM QA READINESS.**
     - **Quality Gate (`PASS` / `GAP` / `BLOCKED`):** Evaluates analytical completeness and evidence integrity.
     - **Recommended QA Readiness (`READY` / `READY WITH GAPS` / `BLOCKED`):** Evaluates whether the code change is reasonably safe to hand off to QA testing. (A feature with an implementation bug can be `READY` for QA testing to expose the bug).
@@ -118,6 +124,10 @@ Act as a senior QA architect and senior software engineer performing evidence-ba
     - **Do NOT** generate final QA test details.
     - **Do NOT** guess, infer, or hallucinate user intent from code changes alone, and **DO NOT synthesize `REQ-XX` items from Git diffs, commits, PR titles, or code comments**.
     - **Immediately respond with `Analysis Status: BLOCKED`** and request the developer to supply the User Story and Acceptance Criteria using the structured input template.
+15. **STRICT ZERO-REASONING-NARRATIVE IN DEFAULT OUTPUT.**
+    In default mode, do NOT output architecture analysis, dependency graphs, risk matrices, evidence ledgers, checklist decisions, internal finding IDs (`IMP-*`, `RISK-*`, `REQ-*`), or step-by-step reasoning narrative. Use those internally to improve the test cases. Default output must contain only information required to execute or understand the test cases.
+16. **SELF-CONTAINED TEST EXECUTION CONTRACT & HARD LENGTH QUALITY RULE.**
+    A QA engineer who has only the generated Test Details and the stated prerequisites must be able to execute the test without reading the developer's code or the Skill's internal analysis. Every test must include concrete `Feasibility` (`Manual` / `Requires test data` / `Requires developer support` / `Requires environment access`). Prefer fewer high-value tests over long explanatory sections.
 
 ---
 
@@ -127,16 +137,24 @@ Act as a senior QA architect and senior software engineer performing evidence-ba
 - **User Story & Acceptance Criteria:** **MANDATORY**. The developer must provide the ticket description, user story, or acceptance criteria at invocation.
 - **Implementation Context:** **OPTIONAL / AUTO-DETECTED**. The skill automatically inspects the local Git branch, staged/unstaged changes, and repository manifests using `scripts/git-context.sh` and `scripts/repository-context.sh`. The developer may optionally supply custom branch diffs or specific file paths if analyzing a target different from active workspace state.
 
-### Execution Modes
-- **`--mode fast`**: One-shot execution. Analyzes context, generates full impact report and test cases without pausing.
-- **`--mode auto` (Default)**: Executes automatically through to the final report, but **pauses for developer confirmation** when:
-  1. A potentially breaking API/data/event contract is detected and compatibility cannot be established.
-  2. A security or tenant boundary change lacks sufficient evidence.
-  3. Cross-service side effects create a high-severity unresolved failure path.
-  4. The impact graph materially changes based on missing information.
-  5. The developer's requirement directly conflicts with the implementation and cannot be resolved.
-  *(Note: A pause is NOT triggered merely because Risk = HIGH; it requires an unresolved ambiguity or contradiction).*
-- **`--mode phased`**: Enforces a **mandatory checkpoint after Phase 1** (Analysis Scope + Requirements + Impact Graph). The skill outputs the impact model and stops, prompting the developer to review and provide overrides (e.g., *"Reporting DB is also affected"*). Upon receiving feedback, the skill records the finding as `[User-Confirmed]`, recomputes risk, blast radius, side effects, and coverage, and then completes Phase 2 (Test Generation & Quality Gate).
+### Primary Output Modes & Invocations
+- **Default Mode (`test-details`):** 
+  - **Triggers:** `/qa-impact-analysis` (canonical invocation), or standard requests to generate QA test details.
+  - **Behavior:** Executes the comprehensive internal analysis pipeline across code, cloud infrastructure, databases, client boundaries, security, and regressions, but outputs **ONLY QA Test Details (Executable Manual Test Cases)** using Template 1 in `references/templates/qa-test-details.md`.
+  - **Constraint:** Zero narrative, zero internal IDs, zero confidence tags.
+- **Full Mode (`--full`):** 
+  - **Triggers:** `/qa-impact-analysis --full`, or natural language: *"Give me the full impact analysis"*, *"Show me why these tests were selected"*, *"Show technical impact report"*.
+  - **Behavior:** Outputs the complete Dual-Layer Technical Impact Analysis report using Template 2 in `references/templates/qa-test-details.md`: Scope & Inspected Evidence + Layer 1 QA Release Handoff + Layer 2 Detailed Technical Impact Analysis (Coverage Matrix, Checklist Decisions, Blast Radius, Side Effects, RBAC Matrix, Compatibility, Devil's Advocate, Existing Test Evaluation, Traceable QA Test Cards, Quality Gate Scorecard).
+- **Phased Mode (`--phased`):** 
+  - **Triggers:** `/qa-impact-analysis --phased`, or natural language: *"Do phased analysis"*, *"Step by step impact review"*.
+  - **Behavior:** Enforces an interactive checkpoint after Phase 1 using Template 3 in `references/templates/qa-test-details.md`:
+    - **Phase 1 Deliverable:** **Requirement Understanding + Detected Change Scope + Confirmed Impact Graph**.
+    - **STOP:** The skill halts and prompts the developer to review and provide corrections to either scope (e.g. *"You missed ReportingService"*) or business requirements (e.g. *"Expected behavior is 404, not 400"*).
+    - **Phase 2 Deliverable:** Upon receiving developer feedback, records findings as `[User-Confirmed]`, recomputes risks, and generates the final QA test details using Template 4 in `references/templates/qa-test-details.md`.
+
+### Interaction Control Flags
+- **`--mode fast`**: One-shot execution. Analyzes context and generates output without pausing for non-critical ambiguities.
+- **`--mode auto` (Default interaction control)**: Executes automatically through to the final deliverable, but **pauses for developer confirmation** if an unresolved contract contradiction or high-severity ambiguity directly prevents sound test generation.
 
 ---
 
@@ -288,30 +306,36 @@ Execute test generation in distinct, cleanly separated passes:
   - Clearly separated from direct acceptance criteria so QA knows what is core requirement vs. what is defensive regression testing.
 - **Pass 3 (Merge & Deduplicate):** Combine into prioritized suite with clear category labels.
 
-Every generated test case MUST adhere to the **Canonical Executable Manual QA Test Schema**:
+Every generated test suite must be grounded in the deep internal analysis pipeline. Test cases are formatted according to the active mode:
+
+#### A. Default Mode (`test-details`) — Clean Executable Manual QA Test Schema
+The default output is tailored strictly for QA engineers to execute without wading through engineering architecture reports.
+- **Top-level Preconditions & Test Data:** Consolidated environment, persona, and test data requirements.
+- **Concise Test Cards:**
+  - `### TC-01 — <Test Scenario Title>`
+  - `**Priority:** P0 / P1 / P2 / P3`
+  - `**Type:** Functional / Negative / Regression / Security / Concurrency / Integration`
+  - `**Feasibility:** Manual / Requires test data / Requires developer support / Requires environment access`
+  - `**Steps:**` Sequential, concrete numbered actions (no generic placeholders like "verify lambda works").
+  - `**Expected Result:**` Clear bullet points detailing observable UI, API, DB, and telemetry behavior.
+- **Self-Contained Execution Contract:** A QA engineer who has only the generated Test Details and stated prerequisites must be able to execute the test without reading code or the Skill's internal analysis.
+- **Intelligent Platform Exclusions:** Only generate tests for affected platforms (Web, Android, iOS, On-Premise). Omit unimpacted platforms. Include an optional brief note only if omission might confuse QA (e.g. `**Scope Note:** No mobile-specific cases included; no affected mobile consumer was identified.`).
+- **Zero Internal Noise:** No internal IDs (`IMP-*`, `RISK-*`, `REQ-*`), no confidence tags (`[Certain]`, `[Likely]`), no pseudo-code or diff dumps.
+
+#### B. Full Mode (`--full`) — Comprehensive Audited Test Schema
+In `--full` mode, test cards include complete analytical metadata:
 - **TC-ID / Title**
 - **Category:** `Direct Requirement (Story AC)` | `Implementation Impact / Regression`
-- **Objective**
-- **Type** (Functional / Negative / Boundary / Regression / Security / Concurrency / Offline / Sync)
-- **Risk** (CRITICAL / HIGH / MEDIUM / LOW)
-- **Priority** (P0 / P1 / P2 / P3)
-- **Execution Tier** (Mandatory QA / Recommended Regression / Optional)
-- **Execution Feasibility:** `READY` | `REQUIRES TEST DATA / FIXTURE SETUP` | `REQUIRES ENVIRONMENT SETUP` | `REQUIRES DEV/INFRA SUPPORT` | `REQUIRES EXTERNAL REPOSITORY` | `NOT EXECUTABLE WITH CURRENT ACCESS`
-- **Target Platform** (Web / Android / iOS / API / Backend / On-Premise)
-- **Environment** (Specified in context / Requires Confirmation)
-- **Persona / Role** (Admin / Manager / User / Cross-Tenant / Unauthenticated)
-- **Preconditions**
-- **Test Data** (Exact payloads when known, or representative data structure)
-- **Execution Steps** (Numbered sequential instructions)
-- **Expected Observable Results:**
-  - **Mandatory Oracle:** Primary user/client observable outcome required for pass/fail (UI text/toast, API status code/body, DB record mutation).
-  - **Diagnostic Observation:** Supporting operational signals (logs, metrics, traces, DLQ checks). Flag for verification if unconfirmed in code.
+- **Objective:** Specific failure mode or contract rule verified
+- **Type, Risk, Priority, Execution Tier, Feasibility, Target Platform, Persona / Role**
+- **Preconditions, Test Data, Execution Steps**
+- **Mandatory Oracle (Pass/Fail) vs. Diagnostic Observation (Telemetry)**
 - **Cleanup / Postconditions**
 - **Traceability & Evidence:** `REQ-ID → IMP-ID → RISK-ID` | `file:line` (Evidence source: `repository` / `requirement` / `user-confirmed`)
 
 ### 11. Mechanical Quality Gate & QA Readiness
 
-Evaluate two separate gates:
+Evaluate two separate gates internally (reported explicitly only in `--full` mode):
 
 1. **Quality Gate Scorecard (`PASS` / `GAP` / `BLOCKED`):**
    - `PASS`: All required evidence, acceptance criteria, and critical risk paths are fully mapped to test cases.
@@ -324,159 +348,30 @@ Evaluate two separate gates:
 
 ---
 
-## Output format
+## Output Formats & Templates
 
-```markdown
-# QA Impact Analysis: [Feature / Bug Fix / Task Title]
+The output format is governed strictly by the active invocation mode. All templates are defined in [`references/templates/qa-test-details.md`](references/templates/qa-test-details.md).
 
-## Analysis Scope & Inspected Evidence
+### 1. Default Mode (`test-details` — `/qa-impact-analysis`)
+- **Use Template 1:** [`references/templates/qa-test-details.md#1-default-test-details-template`](references/templates/qa-test-details.md)
+- **Content:** Strict `# QA Test Details` deliverable containing:
+  - `## Preconditions / Test Data`
+  - `## Test Cases` (TC-01, TC-02...) with Priority, Type, Feasibility, numbered Steps, and bulleted Expected Results.
+  - Optional brief `## Notes` (only when genuinely required for execution or scope clarity).
+- **Enforcement:** Zero reasoning narrative, zero architecture analysis, zero dependency graphs, zero risk matrices, zero evidence ledgers, zero checklist decisions, zero internal finding IDs (`IMP-*`, `RISK-*`, `REQ-*`), zero confidence tags.
 
-- **Repository:** `[repo-name]`
-- **Git Scope:** `[base-branch]...[current-branch]` (`[X]` commits)
-- **Working Tree:** `Clean` / `Uncommitted changes included`
-- **Inspected Evidence:** `[N]` source files, `[N]` infrastructure files, `[N]` test files, `[N]` schemas
-- **Not Inspected / Unavailable:** `[None / mobile-app / external-service / runtime configs]`
-- **Analysis Status:** `COMPLETE` / `PARTIAL` / `BLOCKED`
-- **Confidence Level:** `HIGH` / `MEDIUM` / `LOW` — *[Reasoning]*
+### 2. Full Mode (`--full` — `/qa-impact-analysis --full`)
+- **Use Template 2:** [`references/templates/qa-test-details.md#2-full-analysis-template`](references/templates/qa-test-details.md)
+- **Content:** Complete Dual-Layer Technical Impact Analysis report:
+  - Scope & Inspected Evidence
+  - Layer 1: QA Release Handoff (Summary & Risk Assessment, Must-Test Table, Blocking Risks, Action Items)
+  - Layer 2: Detailed Technical Impact Analysis (Coverage Matrix, Checklist Decisions, Blast Radius, Side Effects, RBAC Matrix, Compatibility, Devil's Advocate, Existing Test Evaluation, Full Audited QA Test Cards, Quality Gate Scorecard).
 
----
+### 3. Phased Mode (`--phased` — `/qa-impact-analysis --phased`)
+- **Phase 1 (Checkpoint):** Use Template 3: [`references/templates/qa-test-details.md#3-phased-phase-1-template-checkpoint`](references/templates/qa-test-details.md)
+  - Outputs: **Requirement Understanding + Detected Change Scope + Confirmed Impact Graph**.
+  - **STOP & WAIT:** Halts execution and asks developer to confirm or correct scope (e.g., *"You missed ReportingService"*) and expectations (e.g., *"Expected behavior is 404, not 400"*).
+- **Phase 2 (Final Test Details):** Use Template 4: [`references/templates/qa-test-details.md#4-phased-final-test-details-template`](references/templates/qa-test-details.md)
+  - Outputs: Clean, executable QA Test Details incorporating developer feedback.
 
-# LAYER 1: QA Release Handoff
-*(Copy-paste ready for Jira / Linear / GitHub PR Description)*
 
-### Summary & Risk Assessment
-- **Change Description:** [1-2 sentences summarizing the change]
-- **Production Risk:** `CRITICAL` / `HIGH` / `MEDIUM` / `LOW`
-- **Blast Radius:** `CRITICAL` / `HIGH` / `MEDIUM` / `LOW`
-- **Contract Compatibility:** `Compatible` / `Breaking` / `Unverified (Cross-Repo)`
-- **Change Type:** `Bug Fix` / `New Feature` / `Refactor` / `API Change` / `DB Migration`
-- **Recommended QA Readiness:** `READY` / `READY WITH GAPS` / `BLOCKED`
-
-### Must-Test Scenarios (Mandatory QA)
-| TC-ID | Title | Priority | Risk | Feasibility | Reason |
-|---|---|---|---|---|---|
-| TC-001 | ... | P0 | HIGH | READY | Direct requirement validation |
-| TC-002 | ... | P0 | HIGH | REQUIRES TEST DATA | Negative path / tenant isolation |
-
-### Blocking Production Risks & Devil's Advocate
-- **Risk 1:** ...
-- **Risk 2:** ...
-
-### Action Items & Ownership
-| Action Item | Owner | Blocking Release? |
-|---|---|:---:|
-| Confirm mobile app deserialization compatibility | Mobile Team | Yes |
-| Verify S3 CORS policy in staging | Developer / DevOps | Yes |
-| Execute mandatory manual QA test cases | QA | Yes |
-
----
-
-# LAYER 2: Detailed Technical Impact Analysis
-
-## 1. Bidirectional Requirements ↔ Test Coverage Matrix
-
-| Requirement / AC | Implementation Status | Implementation Evidence | Test Case | Coverage Status | Risk |
-|---|---|---|---|---|---|
-| REQ-01 | Met | `src/...:line` | TC-001 | Covered | High |
-| REQ-02 (Negative) | Met | `src/...:line` | TC-002 | Covered | High |
-| Unrequested Code | Unrequested Scope | `src/...:line` | — | Not Covered | Medium |
-
-## 2. Checklist Decisions
-
-| Checklist | Decision | Justification |
-|---|:---:|---|
-| `api.md` | LOADED / EXCLUDED | Controller routes and request schema modified |
-| `security.md` | LOADED / EXCLUDED | Tenant isolation guard touched |
-| `aws.md` | LOADED / EXCLUDED | AWS infrastructure or SDK changes evaluated |
-| `on-premise.md` | LOADED / EXCLUDED | Hybrid/on-premise connectors evaluated |
-| `mobile.md` | LOADED / EXCLUDED | Mobile repository or mobile-specific routes affected |
-
-## 3. Impact Summary & Blast Radius
-
-### Verified Impact [Certain]
-- Direct code changes, modified routes, updated database operations with file:line evidence.
-
-### Potential Impact [Likely]
-- Downstream callers, dependent UI components, event consumers.
-
-### Cross-Repository & Unverified Risks [Unknown / Cannot Verify]
-- Companion client apps, external microservice consumers, unverified endpoints.
-
-## 4. Side-Effect Inventory & Partial-Failure Analysis
-*(Include when change creates, updates, or deletes state)*
-- **Primary Effect:** [Main state mutation]
-- **Secondary Side Effects:** [DB rows, S3 files, events, cache, logs]
-- **Partial Failure Analysis:** [Behavior if secondary step fails midway]
-
-## 5. Security & RBAC Authorization Matrix
-*(Include if auth, roles, workplace/tenant, or IDs are touched)*
-
-| Persona / Role | Resource & Scope | Action | Expected Result | Evidence |
-|---|---|---|---|---|
-
-## 6. Compatibility, Caching & Rollout Analysis
-*(Include if API, DB, cache, or feature flags are touched)*
-- **Client Caching:** ...
-- **Rolling Deployment ($N$ / $N+1$):** ...
-- **Feature Flag Strategy:** ...
-
-## 7. Devil's Advocate Failure Analysis
-
-| Hypothesis | Vulnerability / Failure Mode | Evidence / Mechanism | Mitigating Test Case |
-|---|---|---|---|
-
-## 8. QA Test Details (Executable Manual Test Cases)
-
-### TC-001 — [Area]: [Title]
-- **Objective:** ...
-- **Type:** ...
-- **Risk:** ... | **Priority:** ... | **Execution Tier:** ...
-- **Execution Feasibility:** READY / REQUIRES TEST DATA / REQUIRES DEV/INFRA SUPPORT
-- **Target Platform:** ... | **Environment:** Specified in context / Requires Confirmation
-- **Persona / Role:** ...
-- **Preconditions:**
-  1. ...
-- **Test Data:**
-  - ...
-- **Steps:**
-  1. ...
-  2. ...
-- **Expected Observable Results:**
-  - **Mandatory Oracle:**
-    - **UI:** ...
-    - **API:** ...
-    - **Database:** ...
-  - **Diagnostic Observation:**
-    - **Logs/Metrics:** ... *(Flagged for verification if unconfirmed in code)*
-- **Cleanup / Postconditions:** ...
-- **Traceability:** REQ-XX → IMP-XX → RISK-XX
-- **Evidence:** `path/to/file.ts:123` (Source: repository / requirement / user-confirmed)
-
-*(Repeat for each test case. Omit irrelevant sub-bullets.)*
-
-## 9. Existing Coverage & Test Quality Evaluation
-
-- **Automated Tests Execution:** `NOT RUN (inspected statically)` *(or list run results if executed)*
-
-| Test File / Suite | Tested Symbol / Route | Status | Assertion Depth & Notes |
-|---|---|---|---|
-
-## 10. Quality Gate Scorecard & Release Gate
-
-### 9-Dimension Quality Gate Scorecard
-| Dimension | Status | Notes |
-|---|:---:|---|
-| Requirement Completeness | PASS / GAP | Story ambiguity / completeness audit |
-| Requirement Coverage | PASS / GAP | All acceptance criteria mapped |
-| Code/Behavior Coverage | PASS / GAP | All modified code branches tested |
-| Dependency Coverage | PASS / GAP | Downstream callers evaluated |
-| Contract Coverage | PASS / GAP | API/event contracts verified |
-| Security & Tenant Isolation | PASS / GAP | RBAC matrix verified |
-| Cross-Repository Coverage | PASS / GAP / UNKNOWN | Companion repos or contract fallback |
-| Evidence Integrity | PASS / GAP | All assertions grounded in evidence |
-| Automated Test Status | NOT RUN | Inspected statically |
-
-- **Quality Gate Overall:** `PASS` / `GAP` / `BLOCKED`
-- **Recommended QA Readiness:** `READY` / `READY WITH GAPS` / `BLOCKED`
-- **Gate Justification:** ...
-```

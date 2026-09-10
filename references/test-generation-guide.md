@@ -1,28 +1,68 @@
-# Test Generation Guide: Canonical Executable Manual QA Test Schema
+# Test Generation Guide: Executable Manual QA Test Schemas
 
-This guide governs the generation of structured, evidence-backed, execution-ready manual test cases. Every generated test must be deterministic in its steps, actionable by a QA engineer without guesswork, and grounded in code or requirement evidence.
+This guide governs the generation of structured, evidence-backed, execution-ready manual test cases. Every generated test must be deterministic in its steps, actionable by a QA engineer without guesswork, and grounded in code and requirement evidence.
 
 ---
 
-## 1. Canonical Executable Manual QA Test Schema
+## 1. Primary Test Schemas: Clean vs. Audited
 
-Every test case generated under `## QA Test Details` must adhere to this schema:
+The skill supports two presentation schemas depending on whether the invocation is in **Default Mode** or **Full Mode (`--full`)**:
+
+### A. Clean Executable Manual QA Test Schema (Default Mode)
+
+Used in standard `/qa-impact-analysis` invocations. It strictly formats tests for direct QA execution, stripped of engineering architecture and internal reasoning noise.
+
+```markdown
+### TC-[ID] — [Area/Feature]: [Concise, Descriptive Title]
+**Priority:** P0 (Release blocker) | P1 (Must test before release) | P2 (High-value secondary) | P3 (Edge case)
+**Type:** Functional | Negative/Edge Case | Boundary | Regression | Security/RBAC | Concurrency | Offline/Sync | Integration
+**Feasibility:** Manual | Requires test data | Requires developer support | Requires environment access
+
+**Steps**
+1. Detailed, sequential user or client action.
+2. Click / Submit / Trigger action.
+3. Verification action (e.g. inspect list, reload page, check notifications).
+
+**Expected Result**
+- Primary client/UI observable outcome (toast message, updated view, button state).
+- API response status and payload contract (HTTP 200, 400 Bad Request with field error).
+- State persistence (record created in DB, expected column values).
+- Operational telemetry (log level WARN, CloudWatch metric increment) if validating alert behavior.
+```
+
+#### Self-Contained Execution Contract
+> **Rule:** A QA engineer who has only the generated Test Details and stated prerequisites must be able to execute the test without reading the developer's code, Git diffs, or the Skill's internal analysis.
+- Concrete prerequisites or feasibility flags must be stated (e.g. `Feasibility: Requires developer support to inject controlled failure`).
+- Avoid vague placeholders like *"Verify Lambda works"* or *"Simulate an unexpected error"*. Provide concrete steps or state the exact fault-injection mechanism needed.
+
+#### Intelligent Platform Exclusions
+- The skill internally analyzes client consumers (Web, Android, iOS, On-Premise).
+- Tests are generated **only for affected platforms**. Unimpacted platforms are omitted.
+- An optional brief note is added only where omission might confuse QA:
+  > `**Scope Note:** No mobile-specific cases included; no affected mobile consumer was identified.`
+
+#### Zero Internal Noise
+- In default mode, do NOT include:
+  - Internal IDs: `IMP-xxx`, `RISK-xxx`, `REQ-xxx`
+  - Confidence labels: `[Certain]`, `[Likely]`, `[Guessing]`
+  - Risk matrices, blast radius tables, or architecture narratives.
+
+---
+
+### B. Comprehensive Audited Test Schema (Full Mode — `--full`)
+
+Used when the user explicitly requests full technical impact analysis (`--full` or natural language like *"Give me the full impact analysis"*).
 
 ```markdown
 ### TC-[ID] — [Area/Feature]: [Concise, Descriptive Title]
 
 - **Objective:** What specific business rule, failure mode, or risk is this test verifying?
-- **Type:** Functional | Negative/Edge Case | Boundary | Regression | Security/RBAC | Concurrency | Offline/Sync
+- **Category:** `Direct Requirement (Story AC)` | `Implementation Impact / Regression`
+- **Type:** Functional | Negative | Boundary | Regression | Security | Concurrency | Offline | Sync
 - **Risk:** CRITICAL | HIGH | MEDIUM | LOW
-- **Priority:** P0 (Release blocker) | P1 (Must test before release) | P2 (High-value secondary) | P3 (Edge case)
+- **Priority:** P0 | P1 | P2 | P3
 - **Execution Tier:** Mandatory QA | Recommended Regression | Optional Edge Case
-- **Execution Feasibility:** 
-  - `READY` (Can be executed immediately with standard user access)
-  - `REQUIRES TEST DATA / FIXTURE SETUP` (Needs specific records, multi-tenant accounts, or mock state)
-  - `REQUIRES ENVIRONMENT SETUP` (Needs environment variables, feature flags, or sandbox config)
-  - `REQUIRES DEV/INFRA SUPPORT` (Needs fault injection, network throttling, or direct DB/AWS access)
-  - `REQUIRES EXTERNAL REPOSITORY` (Needs companion mobile build or external microservice)
-  - `NOT EXECUTABLE WITH CURRENT ACCESS` (Logically valid but operationally blocked)
+- **Execution Feasibility:** `READY` | `REQUIRES TEST DATA / FIXTURE SETUP` | `REQUIRES ENVIRONMENT SETUP` | `REQUIRES DEV/INFRA SUPPORT` | `REQUIRES EXTERNAL REPOSITORY` | `NOT EXECUTABLE WITH CURRENT ACCESS`
 - **Target Platform:** Web Desktop | Mobile (Android/iOS) | REST API / Backend | On-Premise / Hybrid
 - **Environment:** Specified in context / Requires Confirmation
 - **Persona / Role:** Exact user role (e.g., Workplace Admin, Workflow Submitter, Read-Only Guest, Cross-Tenant Attacker, Unauthenticated)
@@ -50,9 +90,6 @@ Every test case generated under `## QA Test Details` must adhere to this schema:
 - **Evidence:** `relative/path/to/file.ts:line` (Evidence Source: `repository` / `requirement` / `user-confirmed`)
 ```
 
-### Formatting Rule: Omit Irrelevant Sub-bullets
-Do NOT pollute test cases with generic filler text (e.g., "Database: N/A", "Observability: None"). If a test is a pure frontend UI validation with no database mutation or event emission, omit the `Database` and `Event/Workflow` bullets entirely. Keep every included line meaningful.
-
 ---
 
 ## 2. Evidence-Safe Observable Oracles (Anti-Fabrication Protocol)
@@ -79,10 +116,12 @@ Do NOT pollute test cases with generic filler text (e.g., "Database: N/A", "Obse
 
 ## 3. Bidirectional Traceability: Requirements ↔ Implementation ↔ Tests
 
-Maintain bidirectional scrutiny:
+The skill internally maintains strict bidirectional scrutiny before test generation:
 1. **Requirement → Implementation → Test:**
    - Did the developer implement and test all requested acceptance criteria?
    - Any missing acceptance criterion is flagged as `Coverage: Not Covered` with Quality Gate `GAP`.
 2. **Implementation Change → Requirement:**
    - Did the developer introduce unrequested behavior, modified unmentioned endpoints, or add scope creep?
    - Any unrequested code path is flagged as `Unrequested Scope` and evaluated for unintended regression risks.
+
+> **Note on Traceability Exposure:** In default mode, this traceability ledger operates internally to select and prioritize tests without cluttering the QA test document. In `--full` mode, the full traceability chain (`REQ-ID → IMP-ID → RISK-ID`) is explicitly output.
