@@ -12,25 +12,26 @@ disable-model-invocation: false
 
 Before using ANY tool, reading ANY repository file, inspecting Git state, listing directories, or executing ANY command:
 
-1. **Inspect ONLY the user's current prompt/content for:**
-   - User Story / Business Requirement
-   - Acceptance Criteria
+1. **Inspect ONLY the user's current prompt/content for an Actionable Behavioral Requirement:**
+   - A business requirement / user story,
+   - A concrete bug description (with expected vs. actual behavior or specific failure scenario), OR
+   - A specific functional change request.
 
-2. **If either is missing, vague, or not explicitly provided (e.g., only "test changes in this branch", a branch name, commit message, or PR title):**
+2. **If the prompt lacks an actionable behavioral requirement (e.g., only "test changes in this branch", a branch name, commit message, PR title, or ungrounded "test this code"):**
    - **STOP IMMEDIATELY.**
    - **DO NOT INVOKE ANY TOOL.** (Do NOT call `view_file`, `run_command`, `read_browser_page`, `list_dir`, etc.)
    - **Do NOT inspect SKILL.md further.**
    - **Do NOT inspect the repository or Git state.**
-   - **Do NOT infer requirements from implementation evidence.**
+   - **Do NOT infer requirements from implementation evidence or diffs.**
    - **Do NOT generate REQ-* identifiers.**
    - **Respond immediately with:**
 
 ```markdown
 ## 🛑 Analysis Status: BLOCKED (Prerequisite Failure)
 
-**Reason:** Missing mandatory User Story and Acceptance Criteria.
+**Reason:** Missing actionable behavioral requirement or bug description.
 
-The QA Impact Analysis skill strictly operates from business requirements to implementation changes. It will NOT infer or reverse-engineer intended business behavior from:
+The QA Impact Analysis skill strictly operates from business requirements or bug descriptions to implementation changes. It will NOT infer or reverse-engineer intended business behavior from:
 - Git diffs or modified code
 - Commit messages or branch names
 - PR titles
@@ -39,17 +40,20 @@ The QA Impact Analysis skill strictly operates from business requirements to imp
 To generate accurate, requirement-grounded QA test details, please provide:
 
 ### Required Input:
-1. **User Story / Business Requirement:** (e.g., *"As a user, I want..."*)
-2. **Acceptance Criteria:**
-   - Primary happy-path workflow
-   - Negative conditions and validation rules
-   - Role/tenant permissions and limits
+1. **Behavioral Requirement or Bug Description:**
+   - A User Story (e.g., *"As a user, I want..."*),
+   - An actionable bug report (e.g., *"Login fails with MFA when switching workplaces; expected: ... actual: ..."*), OR
+   - A functional change specification with expected behavior.
+2. **Key Acceptance Criteria or Expected Outcomes:**
+   - Primary expected workflow / expected outcome
+   - Negative conditions and validation rules (if known)
+   - Tenant/role permissions or boundaries (if applicable)
 3. **Out of Scope (Optional):** (e.g., *"Llama models are out of scope"*)
 ```
    - **HALT EXECUTION IMMEDIATELY.**
 
-3. **Only if BOTH User Story and Acceptance Criteria are explicitly present in the user prompt:**
-   - Proceed to Section 1 (Critical Rules) and Section 2 (Input & Scope Gate).
+3. **If an actionable behavioral requirement or bug description IS present in the prompt:**
+   - Proceed to Section 1 (Critical Rules) and Section 2 (Input & Scope Gate). Formal Jira-style ceremony (*"As a user... / AC: ..."*) is NOT required if sufficient behavioral intent and expected outcome are conveyed.
 
 This gate has absolute precedence over every other instruction in this Skill.
 
@@ -115,32 +119,33 @@ Keep the intelligence; hide the verbosity. All analytical reasoning (blast radiu
 12. **SELF-CONTAINED TEST EXECUTION CONTRACT & HARD LENGTH QUALITY RULE.**
     A QA engineer who has only the generated Test Details and the stated prerequisites must be able to execute the test without reading the developer's code or the Skill's internal analysis.
     - Every test must include concrete `Feasibility` (`Manual` / `Requires test data` / `Requires developer support` / `Requires environment access`).
-    - **Do NOT expose implementation-derived call chains unnecessary for execution** (e.g. do not write `UserService.getUserData() → DynamoDB UserTable → getItem()`; instead write: *"Request a non-existent user ID; verify API returns 404 Not Found and event is logged as WARN"*).
+    - **Do NOT expose internal implementation call chains unnecessary for execution** (e.g. do not write `UserService.getUserData() → DynamoDB UserTable → getItem()`; instead write: *"Request a non-existent user ID; verify API returns 404 Not Found and event is logged as WARN"*).
+    - **Observable Oracles Across Layers:** This restriction does NOT mean tests are UI-only. Observable verification across API status/payloads, database record state, event/webhook delivery, CloudWatch metrics, alarms, and telemetry logs are first-class oracles whenever required for test execution. Only internal code symbols, class invocations, and function call-trees are prohibited.
     - Prefer fewer high-value tests over long explanatory sections.
 13. **SEPARATE QUALITY GATE FROM QA READINESS.**
-    - **Quality Gate (`PASS` / `GAP` / `BLOCKED`):** Evaluates analytical completeness and evidence integrity.
+    - **Quality Gate (`PASS` / `GAP` / `BLOCKED`):** Evaluates analytical completeness and evidence integrity internally.
     - **Recommended QA Readiness (`READY` / `READY WITH GAPS` / `BLOCKED`):** Evaluates whether the code change is reasonably safe to hand off to QA testing. (A feature with an implementation bug can be `READY` for QA testing to expose the bug).
-14. **MANDATORY INPUT GATE & ANTI-PSEUDO-STORY SYNTHESIS.**
-    A User Story and its Acceptance Criteria **MUST be provided when invoking `/qa-impact-analysis`**. Without the business requirement baseline, the agent cannot distinguish intentional modifications from unintended regressions, nor derive requirement-backed oracles.
-    If the User Story or Acceptance Criteria is missing:
+14. **MANDATORY INPUT GATE & ANTI-REVERSE-ENGINEERING RULE.**
+    An actionable behavioral requirement or bug description **MUST be provided when invoking `/qa-impact-analysis`**. Without the behavioral baseline, the agent cannot distinguish intentional modifications from unintended regressions, nor derive requirement-backed oracles.
+    If an actionable behavioral requirement or bug description is missing:
     - **Do NOT** call any tools or commands.
     - **Do NOT** proceed with impact analysis or blast-radius calculation.
     - **Do NOT** generate final QA test details.
     - **Do NOT** guess, infer, or hallucinate user intent from code changes alone, and **DO NOT synthesize `REQ-XX` items from Git diffs, commits, PR titles, or code comments**.
-    - **Immediately respond with `Analysis Status: BLOCKED`** and request the developer to supply the User Story and Acceptance Criteria using the structured input template.
+    - **Immediately respond with `Analysis Status: BLOCKED`** and request the developer to supply the behavioral context or bug description.
 
 ---
 
 ## 2. Input / Context Gate
 
 Before performing repository inspection:
-1. **User Story & Acceptance Criteria Validation:** Verify both are present in the invocation prompt. If missing, halt immediately per P0 Gate.
+1. **Behavioral Requirement & Context Validation:** Verify that an actionable behavioral requirement, user story, or concrete bug description is present in the invocation prompt. If missing, halt immediately per P0 Gate.
 2. **Context Discovery (Read-Only):**
    - Discover Git branch, base branch, and commit range using `scripts/git-context.sh`.
    - Inspect repository manifests and tech stack using `scripts/repository-context.sh`.
    - Read working tree status (`git status --porcelain`).
    - Identify changed files (source, infrastructure, tests, schemas).
-3. **Out-of-Scope Boundary Enforcement:** Explicitly record any items declared out of scope by the User Story (e.g., *"Llama models are out of scope"*). The agent MUST NOT generate test cases for out-of-scope items.
+3. **Out-of-Scope Boundary Enforcement:** Explicitly record any items declared out of scope by the User Story or bug report (e.g., *"Llama models are out of scope"*). The agent MUST NOT generate test cases for out-of-scope items.
 
 ---
 
@@ -579,6 +584,7 @@ The skill maintains a strict separation between analytical completeness and rele
    - `PASS`: All required evidence, acceptance criteria, and critical risk paths are fully mapped to test cases.
    - `GAP`: A meaningful coverage, requirement completeness, or evidence limitation remains, but analysis is complete.
    - `BLOCKED`: A prerequisite prevented meaningful analysis (e.g., repository unreadable, no code diff available, missing user story).
+   - **Internal Safety Filter in Default Mode:** This scorecard is evaluated strictly as an internal safety filter during Default Mode generation. It **MUST NOT** be output as a table, section, or standalone status badge (`Quality Gate: PASS`) in Default Mode, ensuring the deliverable contains ONLY clean executable QA Test Details.
 2. **Recommended QA Readiness (`READY` / `READY WITH GAPS` / `BLOCKED`):**
    - `READY`: Change is safe and verified for QA handoff.
    - `READY WITH GAPS`: Change can be tested by QA, but specific external risks, staging verifications, or known implementation bugs require attention.
