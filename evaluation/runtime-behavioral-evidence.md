@@ -226,7 +226,8 @@ Acceptance Criteria:
 - API returns `HTTP 500 Internal Server Error` with tracking error ID.
 - CloudWatch log contains `[ERROR]` with stack trace.
 - CloudWatch metric `<5xx-errors>` increments.
-- Alarm transitions to `ALARM` state after breach threshold (2 evaluation periods).
+- Alarm transitions to `ALARM` state according to the configured evaluation threshold.
+- Configured notification action is triggered.
 
 ## Notes
 
